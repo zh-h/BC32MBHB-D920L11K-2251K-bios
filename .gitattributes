@@ -1,0 +1,6 @@
+*.bin binary
+*.rom binary
+*.efi binary
+*.report.txt text
+*.md text
+*.py text
