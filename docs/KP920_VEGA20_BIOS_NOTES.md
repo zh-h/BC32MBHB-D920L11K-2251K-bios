@@ -6,30 +6,35 @@
 - 显卡：AMD **Vega 20**（Radeon Pro VII / Instinct MI50），PCI ID `1002:66A1`
 - VBIOS：`113-D1640600-104`，104448 字节
 - 目标：只修改主板 BIOS（不改显卡 VBIOS），让 Vega 20 在 BIOS POST/Setup 显示
-- 当前定制版本：**1.0-3**
-  `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin`
-  （SHA-256 `5951f282a0ebb03a0e886a49a1623db4796257e8c755b7dfe7c4b0e2d20da330`）
+- 当前定制版本：**1.0-4**
+  `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin`
+  （SHA-256 `b6916035b2c7d5f84e537a6d38972dcd77a32f7c02d5a0806f6b3f30b37be19e`）
 
 状态：GOP 方案已实机验证（Radeon 520、Vega 20 的 BIOS POST/Setup 显示均正常；
 Vega 20 下固件通过 GOP 交接 `simple-framebuffer`，随后 amdgpu 接管）。
-1.0-3 的开机 LOGO 已实机验证：840x260 预补偿版显示正常、比例/大小合适。
-BIOS Version 字段已改为 `1.0-3`；EC 0.23 保持原厂。
+1.0-4 的开机 LOGO 已实机验证：840x260 预补偿版显示正常、比例/大小合适。
+DDRC ACPI 修复已实机验证：DSDT 中 DDRC 设备变为 `HISI9999`，
+去掉 `initcall_blacklist=hisi_ddrc_pmu_module_init` 可正常启动。
+BL31 MPAM 修复已实机验证：从 U 盘启动，GRUB 去掉
+`arm64.nompam` 和 `initcall_blacklist=hisi_ddrc_pmu_module_init`
+可正常启动。
+BIOS Version 字段已改为 `1.0-4`；EC 0.23 保持原厂。
 RX 5700 XT 因在 Kunpeng 上 PCIe 不枚举，不支持。
 
 ---
 
-## 1. 当前定制版本 1.0-3
+## 1. 当前定制版本 1.0-4
 
 文件名格式：
 
 ```
-BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin
+BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin
 ```
 
-原厂 **BIOS Version 是 `1.0`**；`1.0-3` 表示在原厂 1.0 上做第 3 个本地
-定制构建，固件内 BIOS Version 字段也改为 `1.0-3`。
+原厂 **BIOS Version 是 `1.0`**；`1.0-4` 表示在原厂 1.0 上做第 4 个本地
+定制构建，固件内 BIOS Version 字段也改为 `1.0-4`。
 
-1.0-3 的改动：
+1.0-4 的改动：
 
 - 保留原厂 1.68 pre-SoC15 `Arm64Gop` FFS **字节不变**，负责 Radeon 520 / Polaris；
 - 在 inner DXE FV 末尾追加 post-SoC15 2.10 `Arm64Gop` FFS
@@ -39,19 +44,25 @@ BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin
   （`images/Huawei-Logo.bmp`，`840x260` 24-bit，内容 `820x240`，
   黑底白字 + 红色花瓣）；LOGO FFS 扩容并重建 inner FV；
 - 两个 PE 都保留 AMD 签名；
-- **BIOS Version 字段 `1.0` → `1.0-3`**（版本信息块绝对 `0xBF0098`）；
+- **BIOS Version 字段 `1.0` → `1.0-4`**（版本信息块绝对 `0xBF0098`）；
   EC 版本 `0.23` 保持不变；
-- 除 GOP/LOGO/BIOS Version 字段外，未改前 8 MiB 的 bootloader/IMU 和
-  其他 FV 结构。
+- **DDRC PMU ACPI 修复**：DSDT 中 4 个 `HISI0233`（`\_SB.DDR0..DDR3`）
+  改为 `HISI9999` 并重算 DSDT 校验和；`hisi_uncore_ddrc_pmu` 不再匹配，
+  不再需要 `initcall_blacklist=hisi_ddrc_pmu_module_init`；
+- **MPAM EL3 修复**：FIP 内 BL31 的 2 个入口序列改为调用 stub，设置
+  `MPAM3_EL3 = 0x8000000000000000`（MPAMEN=1，TRAPLOWER=0）；
+  不再需要 `arm64.nompam`；
+- 除 GOP/LOGO/BIOS Version/DDRC HID/BL31 外，未改前 8 MiB 的
+  bootloader/IMU 和其他 FV 结构。
 
 版本字段说明：
 
 - EC 版本 `0.23`：独立嵌入式控制器固件，Setup 从 EC 读取，不随本镜像改变；
 - 内核版本 `v2.70`：另一个内部组件版本，不是 BIOS Version；
-- BIOS Version `1.0-3`：主 BIOS 固件版本，由原厂 `1.0` 改为 `1.0-3`；
-  `dmidecode -s bios-version` 已实机确认显示 `1.0-3`。
+- BIOS Version `1.0-4`：主 BIOS 固件版本，由原厂 `1.0` 改为 `1.0-4`；
+  `dmidecode -s bios-version` 已实机确认显示 `1.0-4`。
 
-版本号更新只需改 `scripts/rebuild_bios.py` 的 `CUSTOM_VERSION`（当前 3）；
+版本号更新只需改 `scripts/rebuild_bios.py` 的 `CUSTOM_VERSION`（当前 4）；
 脚本会自动更新文件名、BIOS Version 块（`0xBF0098`）、VersionInfoPeim
 默认版本字符串和复制长度。标签需小于 8 字符（如 `1.0-4`、`1.0-10`）。
 
@@ -148,7 +159,7 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 | Arm64Gop FFS（1.68） | 内层 FV 相对偏移 `0x9A51B8`，size `0x216F2`，type `0x07` |
 | Arm64Gop PE32（1.68） | section body 偏移 `0x91A054`，大小 `0x216C0`（136896 字节） |
 
-### 4.3 1.0-3 追加的 2.10 FFS
+### 4.3 1.0-4 追加的 2.10 FFS
 
 | 项 | 值 |
 |---|---|
@@ -160,18 +171,18 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 | FFS size | `0x18E6C`，header checksum `0x7C`，File checksum `0xAA` |
 | inner FV 新长度 | `0xE8E440`；block map `0x3A391 × 0x40`；header checksum `0x6DD0` |
 | inner stream | FV image section size `0xE8E444`，总长 `0xE8E4C0` |
-| outer section / FFS | `0x1EDD63` / `0x1EDD7B`；FV2 余量 `0xEB15`（60,181 字节） |
+| outer section / FFS | `0x1EDFC0` / `0x1EDFD8`；FV2 余量 `0xE8B8`（59,576 字节） |
 
 ### 4.4 BIOS Version 字段修改
 
-- 版本信息块绝对 `0xBF0098`：8 字节字段 `1.0` → `1.0-3`
-  （`31 2e 30 00 00 00 00 00` → `31 2e 30 2d 33 00 00 00`）。
+- 版本信息块绝对 `0xBF0098`：8 字节字段 `1.0` → `1.0-4`
+  （`31 2e 30 00 00 00 00 00` → `31 2e 30 2d 34 00 00 00`）。
 - VersionInfoPeim 的默认 BIOS Version 字符串 `1.0`（绝对 `0x89B144`）
-  改为 `1.0-3`；同处构建 HOB 时只复制 4 字节，已把复制长度指令
+  改为 `1.0-4`；同处构建 HOB 时只复制 4 字节，已把复制长度指令
   （绝对 `0x897D2C`，`mov x2, #4`）改为 `mov x2, len(tag)+1`，
   修复 `1.0-` 截断。
 - 该 HOB 是 Setup 动态 BIOS Version 和 SMBIOS Type 0 BIOS Version 的来源；
-  `dmidecode -s bios-version` 已实机确认显示 `1.0-3`。
+  `dmidecode -s bios-version` 已实机确认显示 `1.0-4`。
 - EC 版本字段绝对 `0xBF0058` 保持 `0.23`；EC 版本由 PlatformSetupDxe
   通过 `Get EC Version` 从 EC 读取，和 BIOS 字符串无关。
 - 内核版本 `v2.70` 及 BIOS Revision/Firmware Revision `0.23` 不做修改。
@@ -179,7 +190,7 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
   标题和 BIOS Version 字段是两套独立字符串，本次只改 HOB/BIOS Version
   字段。此前尝试扩展 HII 标题包未能达到预期，相关改动已全部撤销。
 
-### 4.5 1.0-3 开机 LOGO 替换
+### 4.5 1.0-4 开机 LOGO 替换
 
 | 项 | 值 |
 |---|---|
@@ -211,6 +222,59 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 - **实机验证（2026-10-31）**：840x260 预补偿版本显示正常，比例正确、
   大小合适，宽度约屏幕 80%，不再黑屏或占满。
 
+### 4.6 DDRC PMU ACPI 修复
+
+| 项 | 值 |
+|---|---|
+| ACPI storage FFS | `7E374E25-8E01-4FEE-87F2-390C23C606CD`，raw section |
+| DSDT body | inner `0x60DA4C`，长度 `0x7EE7`（32,487 字节） |
+| 原 DSDT SHA-256 | `bc6c70999e710c9f9c170c8d4264909b5b06f46efe1fa98afcc5735fd9270e11` |
+| 原 HID | `HISI0233` ×4（DSDT rel `0x77DD/0x7894/0x794B/0x7A04`） |
+| 新 HID | `HISI9999` ×4（同长度，`_CRS` 基址 `0x94D20000..0x94D50000` 不变） |
+| 校验和 | DSDT offset 9 重算（原 `0x85` → 新 `0x15`），表长不变 |
+
+- `hisi_uncore_ddrc_pmu.ko` 的 ACPI alias 是 `HISI0233/HISI0234/HISI0235`；
+  `HISI9999` 不被任何已安装模块匹配，udev 不会加载该模块，也不会 probe
+  DDRC 设备；
+- 效果与之前的 `initcall_blacklist=hisi_ddrc_pmu_module_init` 一致；
+  DDRC PMU 事件不可用；
+- **Step 1 实机验证**：只含此修复的测试镜像（SHA-256
+  `01b8dea6cadbc5f04851dd8583a0a87e3a6bce1fc5d8f6edcb39aecf47da3900`）
+  刷入后，运行中 DSDT 设备为 `HISI9999:00..03`，没有 `HISI0233:*`；
+  去掉 `initcall_blacklist=hisi_ddrc_pmu_module_init` 可正常启动，
+  `hisi_uncore_ddrc` 未加载。
+
+### 4.7 BL31 MPAM 修复
+
+| 项 | 值 |
+|---|---|
+| FIP magic | `0x12345678AA640001`，绝对 `0xBB0000`（全镜像唯一） |
+| BL31 FIP entry | UUID `6D08D447-FE4C-4698-9B95-2950CBBD5A00` |
+| BL31 位置/大小 | `file_offset 0x3235`、`size 0xA0F1` → 绝对 `0xBB3235..0xBBD326` |
+| 原 BL31 SHA-256 | `f764b841bf8c6cca1b1a4782d0eaac66484476f641ee659484dd30894e568275` |
+| 初始化序列 | `FF4403D5 000080D2 40111ED5`（`msr DAIFClr,#4; mov x0,#0; msr CPTR_EL3,x0`） |
+| 序列位置 | BL31 rel `0x54`、`0x16C` → 绝对 `0xBB3289`、`0xBB33A1` |
+| stub 字符串 | `"Unhandled Interrupt Exception in EL3.\n"`，BL31 rel `0x7E56`（绝对 `0xBBB08B`） |
+| stub 位置/大小 | 对齐后 rel `0x7E58`（绝对 `0xBBB08D`），24 字节 |
+| stub 内容 | `mov x0,#0x8000; lsl x0,x0,#48; msr MPAM3_EL3,x0; isb; mov x0,#0; ret` |
+| BL 指令 | `0x94001F80`、`0x94001F3A`（替换两处 `mov x0,#0`） |
+| BL31 变化 | 仅 32 字节（2×4 字节 BL + 24 字节 stub），其余字节不变 |
+
+- 原 BL31 没有初始化 MPAM，`MPAM3_EL3.TRAPLOWER` 保持复位值 1；Linux
+  6.13+ 读取 MPAM 寄存器时陷入 EL3 并挂死。stub 设置
+  `MPAM3_EL3 = 0x8000000000000000`（MPAMEN=1，TRAPLOWER=0），
+  然后返回 x0=0，继续原来的 `msr CPTR_EL3,x0`；
+- 只改 BL31，不改 BL1、FIP header/entry、FV 结构、前 8 MiB；
+- **布局核对**：BL31 的代码和字符串表在同一个 `ro` section（rel `0x7000`
+  处代码后紧接 `v2.2...` 字符串，没有页分隔），按 ATF `bl31.ld.S` 该
+  section 映射为 read-only/executable，stub 位置可执行；
+- 方案参考 `dixyes/d920s10` 的 `patch_bl.c`（GPL-2.0）；该项目的
+  README 明确说明同类 1-way Hi1620 平台（并提到 D920L11 可能适用）；
+- 构建时严格校验 FIP magic/BL31 UUID/BL31 SHA/2 个 pattern/1 个 stub
+  字符串，并校验 BL 目标、stub 字节和 32 字节 diff；
+- **实机验证**：从 U 盘启动，GRUB 去掉 `arm64.nompam` 和
+  `initcall_blacklist=hisi_ddrc_pmu_module_init` 可正常启动。
+
 ---
 
 ## 5. AMD post-SoC15 ARM64Gop 2.10
@@ -239,40 +303,47 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 
 ---
 
-## 6. 1.0-3 的构建方式
+## 6. 1.0-4 的构建方式
 
-`scripts/rebuild_bios.py` 默认（也是唯一）构建当前版本 1.0-3：
+`scripts/rebuild_bios.py` 默认（也是唯一）构建当前版本 1.0-4：
 
 1. 读取原厂镜像，校验 SHA-256 为原厂镜像，检查 FV2/外层 FFS/GUIDed LZMA
    section 结构。
-2. 解压 inner LZMA stream，定位原 1.68 Arm64Gop FFS（inner `0x9A51B8`，
+2. 在 BIOS 区定位 FIP（`0xBB0000`），按 UUID 找 BL31（`0xBB3235..0xBBD326`），
+   校验原 BL31 SHA 和 pattern，改写 2 个入口序列并写入 MPAM stub（§4.7）；
+   只改 BL31 内 32 字节，FIP header/entry 不变。
+3. 解压 inner LZMA stream，定位 DSDT，把 4 个 `HISI0233` 改为 `HISI9999`，
+   重算 DSDT checksum（§4.6）；定位原 1.68 Arm64Gop FFS（inner `0x9A51B8`，
    size `0x216F2`），确认 PE SHA 为 `22021e0a...`，**字节不变**。
-3. 把版本信息块 BIOS Version 字段 `1.0` 改为 `1.0-3`（§4.4）；替换/扩容
+4. 把版本信息块 BIOS Version 字段 `1.0` 改为 `1.0-4`（§4.4）；替换/扩容
    开机 LOGO（§4.5），后续 FFS 按原有 `0x80` 对齐整体平移；EC 版本
    `0.23` 不变。
-4. 新建 2.10 FFS（GUID `92F10585-...`，UI `ARM64Gop 2.10`）：
+5. 新建 2.10 FFS（GUID `92F10585-...`，UI `ARM64Gop 2.10`）：
    PE32 section `0x10` + UI section `0x15`，FFS 大小 `0x18E6C`。
-5. 追加到 inner FV 最后一个文件的对齐末尾 `0xE755B8`；FV 长度按块表 `0x40`
+6. 追加到 inner FV 最后一个文件的对齐末尾 `0xE755B8`；FV 长度按块表 `0x40`
    对齐到 `0xE8E440`，block map `0x3A391 × 0x40`，重算 FV header checksum。
-6. 重新压缩 inner stream（LZMA1，lc=3/lp=0/pb=2，dict 16 MiB），重建外层
+7. 重新压缩 inner stream（LZMA1，lc=3/lp=0/pb=2，dict 16 MiB），重建外层
    GUIDed/LZMA section 和 FFS，更新外层 FFS size/checksum，释放尾部填 `0xFF`。
-   本次 outer section `0x1EDD63`、outer FFS `0x1EDD7B`，FV2 余量
-   `0xEB15`（60,181 字节）。
-7. 自检：
+   本次 outer section `0x1EDFC0`、outer FFS `0x1EDFD8`，FV2 余量
+   `0xE8B8`（59,576 字节）。
+8. 自检：
    - 136 个 inner FFS、FV/FFS header checksum；
    - block map 乘积等于 FvLength；
    - 旧 1.68 PE SHA `22021e0a...` 不变；
    - 新 2.10 PE SHA `c0b47fe3...`；
-   - BIOS Version 字段为 `1.0-3`；EC 0.23 保持原厂；
+   - BIOS Version 字段为 `1.0-4`；EC 0.23 保持原厂；
    - 输出开机 LOGO 与 `images/Huawei-Logo.bmp` 逐字节一致；
+   - DSDT 为 4 个 `HISI9999`、0 个 `HISI0233`、checksum 有效、长度不变；
+   - BL31 为 2 条正确 BL + stub，恰好 32 字节变化，pattern 不再存在；
+   - 前 8 MiB 与源镜像逐字节一致；
    - LZMA 解压回读、outer/inner 结构检查；
-   - diff 位于 outer FFS 和版本信息块 `0xBF0098` 字段。
+   - diff 位于 outer FFS、版本信息块 `0xBF0098` 字段和 BL31 区间。
 
 产物：
 
 | 文件 | 大小 | SHA-256 |
 |---|---:|---|
-| `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin` | 16,777,216 | `5951f282a0ebb03a0e886a49a1623db4796257e8c755b7dfe7c4b0e2d20da330` |
+| `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin` | 16,777,216 | `b6916035b2c7d5f84e537a6d38972dcd77a32f7c02d5a0806f6b3f30b37be19e` |
 
 ---
 
@@ -285,7 +356,7 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 - 编程器写完整 16 MiB；SPI 芯片可插拔。
 - 原厂镜像备份 SHA-256：`e900c384175cf424b970163109cfe36829fa0d459fbd99d1af954257f63b3704`。
 
-### 7.2 1.0-3 结果
+### 7.2 1.0-4 结果
 
 - **Radeon 520**：原 1.68 驱动正常显示，行为与原厂一致。
 - **Vega 20**：BIOS POST/Setup 画面正常；内核日志出现
@@ -294,14 +365,22 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
   ATOM BIOS `113-D1640600-104`）。
 - **Radeon 520 + Vega 20 同插**：两张卡的 BIOS 显示均正常；BIOS 控制台可能
   只挂在其中一块显示器，属于 BDS/ConSplitter 选择，以 OS 下 amdgpu 为准。
-- 1.0-3 的 GOP 部分沿用已实机验证的方案；开机 LOGO 已实机验证：
+- 1.0-4 的 GOP 部分沿用已实机验证的方案；开机 LOGO 已实机验证：
   840x260 预补偿版显示正常、比例/大小合适、约 80% 屏宽；
-  BIOS Version 字段已改为 `1.0-3`，EC 版本 `0.23` 保持原厂；
-  `dmidecode -s bios-version` 已实机确认为 `1.0-3`。
-- **刷写方式**：BIOS Setup 内置固件升级已实机验证可用（无需编程器）；
-  把镜像复制到 U 盘后，在升级界面选择文件名
-  `BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin`（没有目录路径）。
-  SPI 编程器方式保留用于离线刷写/恢复。
+  BIOS Version 字段已改为 `1.0-4`，EC 版本 `0.23` 保持原厂；
+  `dmidecode -s bios-version` 已实机确认为 `1.0-4`。
+- **DDRC ACPI 修复（Step 1）**：只含 DSDT 修改的测试镜像
+  `01b8dea6cadbc5f04851dd8583a0a87e3a6bce1fc5d8f6edcb39aecf47da3900`
+  用 BIOS 内置升级刷入；运行中 ACPI 设备为 `HISI9999:00..03`，无
+  `HISI0233:*`；GRUB 去掉 `initcall_blacklist=hisi_ddrc_pmu_module_init`、
+  保留 `arm64.nompam` 可正常启动，`hisi_uncore_ddrc` 未加载。
+- **MPAM BL31 修复（最终镜像）**：已实机验证：从 U 盘启动，GRUB 去掉
+  `arm64.nompam` 和 `initcall_blacklist` 可正常启动。
+- **刷写方式**：Step 1 已用 BIOS 内置升级验证；最终镜像包含 BL31，建议用
+  SPI 编程器写整片（同版本内置升级可能被 `VersionCheck` 拒绝，且编程器能
+  确保 BL31 区域确实写入）。若走内置升级，刷后需读回核对 BL31
+  `0xBB328D/0xBB33A5/0xBBB08D` 字节。
+  SPI 编程器方式也用于离线刷写/恢复。
 
 ### 7.3 开发过程中的验证结论
 
@@ -332,6 +411,18 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 
 - **RX 5700 XT**：2.10 设备表覆盖 Navi 10，但平台 PCIe 不枚举，实际不支持。
 - **RX 6000（RDNA2）**：主流 ID 不在 2.10 设备表内，本次不支持。
+- **BL31 MPAM 补丁风险**：修改 EL3 代码；写错会导致主板无法启动，只能
+  用 SPI 编程器恢复。构建脚本对 FIP/BL31/pattern/stub/diff 做严格校验，
+  刷写前保留原厂镜像和当前 SPI 全片备份。
+- **DDRC PMU 被禁用**：4 个 DDRC 设备的 HID 改为 `HISI9999`，DDRC PMU
+  事件不可用；与之前 blacklist 整个驱动的效果一致。
+- **MPAM 无 ACPI 表**：BL31 初始化后内核可读 MPAM 寄存器，但本固件没有
+  MPAM ACPI 表；本机已实机验证可正常启动（U 盘、无两个参数），没有可用的
+  MPAM/resctrl 资源。
+- **BL1/安全启动**：FIP 中没有 BL31 证书/哈希条目，未发现 BL31 签名校验；
+  若实际启用了安全启动，补丁可能被拒绝。刷前保留全片备份，失败用编程器恢复。
+- **内置升级限制**：UpdateFirmware 含 `VerifySignedImage`/`VersionCheck`；
+  最终镜像建议用编程器，或刷后读回确认 BL31 已写入。
 - **签名策略**：两个 PE 都保留 AMD 签名；若以后换驱动，需保持签名完整或按
   平台策略处理。
 - **恢复**：芯片可插拔，原厂镜像 `e900c384...` 可随时用编程器恢复。
@@ -343,16 +434,16 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 ## 9. 复现命令
 
 ```bash
-# 构建当前版本 1.0-3（固定输出）
+# 构建当前版本 1.0-4（固定输出）
 python3 scripts/rebuild_bios.py
 
 # 结构检查
-uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin" report
+uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin" report
 ```
 
 > 可重复性：脚本每次都从原厂镜像（`--src` 默认）重建，**不会读取上一次
 > 输出**；同一源镜像、同一驱动和同一 libLZMA 下重复运行输出 SHA-256 相同
-> （本机多次验证为 `5951f282a0ebb03a0e886a49a1623db4796257e8c755b7dfe7c4b0e2d20da330`）。
+> （本机多次验证为 `b6916035b2c7d5f84e537a6d38972dcd77a32f7c02d5a0806f6b3f30b37be19e`）。
 > 源镜像只读；写盘在全部自检通过之后才发生。换 Python/liblzma 版本可能改变
 > 压缩字节从而改变哈希，但解压后的内容与结构校验不变。若输出文件已存在且
 > 内容不同，脚本会拒绝覆盖；确认覆盖时加 `--force`。
@@ -364,7 +455,7 @@ uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin" rep
 | 文件 | 用途 |
 |---|---|
 | `firmware/original/BC32MBHB-D920L11K-2251K_1.0_2020-07-22.bin` | 原始固件备份（`e900c384...`） |
-| `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin` | 当前定制版本；Radeon 520 + Vega 20（`5951f282...`） |
+| `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin` | 当前定制版本；Radeon 520 + Vega 20 + DDRC/MPAM 修复（`b6916035...`） |
 | `drivers/Arm64Gop_1_68.efi` | 原厂 pre-SoC15 AArch64 GOP（与 BIOS 内原 PE 字节一致，`22021e0a...`） |
 | `drivers/ARM64Gop_2_10.efi` | AMD post-SoC15 AArch64 GOP，原生 Vega 10/12/20（`c0b47fe3...`） |
 | `images/Huawei-Logo.wine.png` | 开机 LOGO 源图（3000x2000，透明背景） |
@@ -372,8 +463,8 @@ uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin" rep
 | `reference/vbios.rom` | Vega 20 显卡 VBIOS dump |
 | `reference/AMD.RadeonProVII.16384.200818.rom` | 参考 VBIOS |
 | `reports/BC32MBHB-D920L11K-2251K_1.0_2020-07-22.bin.report.txt` | 原厂镜像 UEFIExtract 结构报告 |
-| `reports/BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin.report.txt` | 1.0-3 镜像 UEFIExtract 结构报告 |
-| `scripts/rebuild_bios.py` | 解压/追加 GOP/替换版本与 LOGO/重压缩/重建镜像，带自检 |
+| `reports/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin.report.txt` | 1.0-4 镜像 UEFIExtract 结构报告 |
+| `scripts/rebuild_bios.py` | 解压/追加 GOP/替换版本与 LOGO/DSDT HID/BL31 MPAM/重压缩/重建镜像，带自检 |
 | `docs/FLASH_GUIDE.md` | 直接刷写步骤 |
 
 ---
@@ -388,3 +479,9 @@ uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin" rep
 - AArch64 option ROM 构建参考：`https://www.workofard.com/2020/12/aarch64-option-roms-for-amd-gpus/`
 - UEFIRomExtract：`https://github.com/andyvand/UEFIRomExtract`
 - Tiano 解压源码：`https://github.com/sstjohn/python-eficompressor`
+- D920S10 ACPI/BL31 修复参考（`patch_bl.c`、`dsdt_fix.c`，GPL-2.0）：
+  `https://github.com/dixyes/d920s10`
+- `hisi_ddrc_pmu` DDRC_VERSION 挂死讨论（维护者要求修固件）：
+  `https://patchwork.kernel.org/project/linux-arm-kernel/patch/20241010084217.37540-1-youwan@nfschina.com/`
+- `arm64.nompam` 说明（firmware 未初始化 MPAM 的绕过）：
+  Linux `Documentation/arch/arm64/mpam.rst` / `arm64: Add override for MPAM`

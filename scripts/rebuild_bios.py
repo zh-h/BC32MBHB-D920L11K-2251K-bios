@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
-"""Build the current custom KP920 BIOS image (1.0-3).
+"""Build the current custom KP920 BIOS image (1.0-4).
 
 Output filename::
 
-    BC32MBHB-D920L11K-2251K_1.0-3_2020-07-22.bin
+    BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin
 
-1.0 is the stock BIOS Version and 3 is the custom revision.  The revision is
+1.0 is the stock BIOS Version and 4 is the custom revision.  The revision is
 bumped as the modifications evolve; it is not a menu of alternative images.
 
-1.0-3 keeps the stock 1.68 pre-SoC15 Arm64Gop FFS (Radeon 520) byte-for-byte
+1.0-4 keeps the stock 1.68 pre-SoC15 Arm64Gop FFS (Radeon 520) byte-for-byte
 and appends a post-SoC15 2.10 Arm64Gop FFS (Vega 20) to the inner DXE FV.
 It also replaces the 300x95 boot logo with the generated Huawei logo.
-The firmware's EC version (0.23) and BIOS Version (1.0) are left untouched;
-the custom version is only a filename/build tag.
+The DSDT HISI0233 DDRC PMU HIDs are renamed to HISI9999 so that
+hisi_uncore_ddrc_pmu does not bind (it hangs reading DDRC_VERSION here).
+The BL31 entry code in the FIP is patched to initialize MPAM3_EL3, so
+Linux no longer needs arm64.nompam.
+The firmware's BIOS Version field is changed from 1.0 to 1.0-4;
+the EC version (0.23) is left untouched.
 
 Only the compressed DXE FV's outer FFS file is rebuilt.  FFS header checksums
 are left untouched for data-only changes; the EDK2 FFS file checksum field is
@@ -27,9 +31,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Current (single) custom version: stock BIOS Version 1.0 + custom build 3.
+# Current (single) custom version: stock BIOS Version 1.0 + custom build 4.
 STOCK_BIOS_VERSION = "1.0"
-CUSTOM_VERSION = 3
+CUSTOM_VERSION = 4
 BUILD_DATE = "2020-07-22"
 IMAGE_STEM = "BC32MBHB-D920L11K-2251K"
 CUSTOM_VERSION_TAG = f"{STOCK_BIOS_VERSION}-{CUSTOM_VERSION}"
@@ -77,6 +81,30 @@ BOOT_LOGO_BMP = ROOT / "images" / "Huawei-Logo.bmp"
 BOOT_LOGO_SHA = "8944e3ebd1b135d90af3e1b1dfeb7c7229b3f12e861f3727af548dfcc21393dd"
 ORIG_BOOT_LOGO_SIZE = 85554  # stock 300x95 24-bit BMP
 ORIG_BOOT_LOGO_SHA = "774a3dc6450d82c9723e772d5877419d3b6cf714bedb6369541e14ec3a631bce"
+
+# DDRC PMU devices are advertised as HISI0233 in the ACPI DSDT, but the
+# hisi_uncore_ddrc_pmu driver hangs reading DDRC_VERSION on this board.
+# Rename the HID to one no driver matches; HISI0234/HISI0235 are also matched
+# by that module, so use an unused ID.  The replacement keeps the DSDT length
+# unchanged; only the table checksum (offset 9) is recomputed.
+ACPI_STORAGE_GUID = uuid.UUID("7e374e25-8e01-4fee-87f2-390c23c606cd")
+ORIG_DSDT_SHA = "bc6c70999e710c9f9c170c8d4264909b5b06f46efe1fa98afcc5735fd9270e11"
+DSDT_LEN = 0x7EE7
+DDRC_HID_OLD = b"HISI0233"
+DDRC_HID_NEW = b"HISI9999"
+DDRC_HID_COUNT = 4
+
+# ATF BL31 MPAM init patch.  The stock BL31 leaves MPAM3_EL3.TRAPLOWER at its
+# reset value, so Linux traps to EL3 on its first MPAM register access and
+# hangs.  Patch both BL31 entry sequences to call a stub that sets MPAMEN and
+# clears TRAPLOWER.  Technique from dixyes/d920s10 (GPL-2.0).
+FIP_MAGIC = 0x12345678AA640001
+BL31_UUID = uuid.UUID("6d08d447-fe4c-4698-9b95-2950cbbd5a00")
+BL31_INIT_PATTERN = bytes.fromhex("ff4403d5000080d240111ed5")
+BL31_STUB_STRING = b"Unhandled Interrupt Exception in EL3.\n"
+BL31_STUB = bytes.fromhex("000090d2003c50d300a51ed5df3f03d5000080d2c0035fd6")
+ORIG_BL31_SHA = "f764b841bf8c6cca1b1a4782d0eaac66484476f641ee659484dd30894e568275"
+BL31_INIT_SITES = 2
 
 FV2_OFF = 0x860000
 FV2_LEN = 0x320000
@@ -251,6 +279,196 @@ def patch_boot_logo(fv):
             print(f"boot logo: placed at inner {body_off:#x}")
             return new_fv, body_off, new
     raise SystemExit("new boot logo raw section not found")
+
+
+def find_dsdt(fv):
+    """Return (absolute_offset, DSDT bytes) from the ACPI storage FFS."""
+    off, sz = find_ffs_by_guid(fv, str(ACPI_STORAGE_GUID))
+    found = []
+    for p, _, typ, body in parse_sections(fv[off + 24:off + sz]):
+        if typ == 0x19 and body[:4] == b"DSDT":
+            found.append((off + 24 + p + 4, bytes(body)))
+    if len(found) != 1:
+        raise SystemExit(f"expected one DSDT section, found {len(found)}")
+    return found[0]
+
+
+def verify_ddrc_hids(fv, label):
+    """Check that the DSDT hides all HISI0233 DDRC PMU devices."""
+    _, dsdt = find_dsdt(fv)
+    if len(dsdt) != DSDT_LEN or int.from_bytes(dsdt[4:8], "little") != DSDT_LEN:
+        raise SystemExit(f"{label}: unexpected DSDT length")
+    if dsdt.count(DDRC_HID_NEW) != DDRC_HID_COUNT or DDRC_HID_OLD in dsdt:
+        raise SystemExit(f"{label}: DDRC HID patch missing")
+    if sum(dsdt) & 0xFF:
+        raise SystemExit(f"{label}: DSDT checksum invalid")
+    print(
+        f"  {label}: DDRC HIDs {DDRC_HID_OLD.decode()} -> "
+        f"{DDRC_HID_NEW.decode()} x{DDRC_HID_COUNT}, DSDT checksum OK"
+    )
+
+
+def patch_ddrc_hids(fv):
+    """Rename the broken DDRC PMU ACPI HIDs in the DSDT.
+
+    The hisi_uncore_ddrc_pmu driver hangs reading DDRC_VERSION on this
+    board.  Renaming HISI0233 to an unused HID stops the module from
+    binding/autoloading while keeping the DSDT length unchanged.
+    """
+    dsdt_off, dsdt = find_dsdt(fv)
+    if len(dsdt) != DSDT_LEN or int.from_bytes(dsdt[4:8], "little") != DSDT_LEN:
+        raise SystemExit("unexpected source DSDT length")
+    if hashlib.sha256(dsdt).hexdigest() != ORIG_DSDT_SHA:
+        raise SystemExit("source DSDT is not the expected original")
+    count = dsdt.count(DDRC_HID_OLD)
+    if count != DDRC_HID_COUNT:
+        raise SystemExit(
+            f"expected {DDRC_HID_COUNT} {DDRC_HID_OLD!r} devices, found {count}"
+        )
+    patched = bytearray(dsdt.replace(DDRC_HID_OLD, DDRC_HID_NEW))
+    patched[9] = 0
+    patched[9] = (-sum(patched)) & 0xFF
+    if sum(patched) & 0xFF:
+        raise SystemExit("DSDT checksum calculation failed")
+    if patched.count(DDRC_HID_NEW) != DDRC_HID_COUNT or DDRC_HID_OLD in patched:
+        raise SystemExit("DSDT HID replacement failed")
+    fv[dsdt_off:dsdt_off + len(dsdt)] = patched
+    print(
+        f"DDRC ACPI: {count} x {DDRC_HID_OLD.decode()} -> "
+        f"{DDRC_HID_NEW.decode()} (DSDT @ inner {dsdt_off:#x}, "
+        f"len {len(dsdt):#x})"
+    )
+
+
+def find_bl31(img):
+    """Return (fip, base, size, payload) for the BL31 in the FIP."""
+    magic = struct.pack("<Q", FIP_MAGIC)
+    hits = []
+    p = 0x800000
+    while True:
+        p = img.find(magic, p, 0xC00000)
+        if p < 0:
+            break
+        hits.append(p)
+        p += 1
+    if len(hits) != 1:
+        raise SystemExit(
+            f"expected one FIP magic at 0x800000..0xc00000, found {len(hits)}"
+        )
+    fip = hits[0]
+    entries = []
+    for i in range(16):
+        off = fip + 16 + i * 40
+        if off + 40 > len(img):
+            break
+        if uuid.UUID(bytes_le=bytes(img[off:off + 16])) != BL31_UUID:
+            continue
+        file_off, file_size, _flags = struct.unpack_from("<QQQ", img, off + 16)
+        entries.append((file_off, file_size))
+    if len(entries) != 1:
+        raise SystemExit(f"expected one BL31 FIP entry, found {len(entries)}")
+    file_off, file_size = entries[0]
+    base = fip + file_off
+    if file_size == 0 or base < fip or base + file_size > len(img):
+        raise SystemExit("BL31 FIP entry is out of bounds")
+    return fip, base, file_size, bytes(img[base:base + file_size])
+
+
+def patch_mpam_bl31(img):
+    """Initialize MPAM in both BL31 entry sequences.
+
+    BL31's stock entry code leaves MPAM3_EL3.TRAPLOWER at its reset value.
+    Replace the following ``mov x0, #0`` with a call to a stub that sets
+    MPAMEN and clears TRAPLOWER, then still returns x0 = 0.
+    """
+    fip, base, size, orig_bl31 = find_bl31(img)
+    if hashlib.sha256(orig_bl31).hexdigest() != ORIG_BL31_SHA:
+        raise SystemExit("source BL31 is not the expected original")
+    sites = []
+    p = 0
+    while True:
+        p = orig_bl31.find(BL31_INIT_PATTERN, p)
+        if p < 0:
+            break
+        sites.append(p)
+        p += 1
+    if len(sites) != BL31_INIT_SITES:
+        raise SystemExit(
+            f"expected {BL31_INIT_SITES} BL31 init sites, found {len(sites)}"
+        )
+    stub_str = orig_bl31.find(BL31_STUB_STRING)
+    if stub_str < 0 or orig_bl31.find(BL31_STUB_STRING, stub_str + 1) >= 0:
+        raise SystemExit("expected exactly one BL31 stub string")
+    stub_rel = (stub_str + 3) & ~3
+    if (stub_rel < stub_str or
+            stub_rel + len(BL31_STUB) > stub_str + len(BL31_STUB_STRING)):
+        raise SystemExit("BL31 stub does not fit inside the stub string")
+
+    patched = bytearray(orig_bl31)
+    expected = set()
+    for site in sites:
+        imm = (stub_rel - (site + 4)) // 4
+        if not -(1 << 25) <= imm < (1 << 25):
+            raise SystemExit("BL31 stub is out of BL range")
+        if site + 4 + 4 * imm != stub_rel:
+            raise SystemExit("BL31 BL target calculation failed")
+        patched[site + 4:site + 8] = struct.pack(
+            "<I", 0x94000000 | (imm & 0x3FFFFFF)
+        )
+        expected.update(range(site + 4, site + 8))
+    patched[stub_rel:stub_rel + len(BL31_STUB)] = BL31_STUB
+    expected.update(range(stub_rel, stub_rel + len(BL31_STUB)))
+    diffs = [i for i in range(size) if patched[i] != orig_bl31[i]]
+    if diffs != sorted(expected):
+        raise SystemExit(f"unexpected BL31 diff set ({len(diffs)} bytes)")
+    if BL31_INIT_PATTERN in patched:
+        raise SystemExit("an unpatched BL31 init sequence remains")
+    img[base:base + size] = patched
+    print(
+        f"MPAM BL31: FIP {fip:#x}, BL31 {base:#x}..{base + size:#x}, "
+        f"sites {[hex(base + s) for s in sites]}, "
+        f"stub {base + stub_rel:#x}, {len(diffs)} bytes changed"
+    )
+    return base, size
+
+
+def verify_mpam_bl31(out, orig):
+    """Verify the output BL31 contains exactly the MPAM patch."""
+    _, base, size, out_bl31 = find_bl31(out)
+    orig_bl31 = orig[base:base + size]
+    sites = []
+    p = 0
+    while True:
+        p = orig_bl31.find(BL31_INIT_PATTERN, p)
+        if p < 0:
+            break
+        sites.append(p)
+        p += 1
+    if len(sites) != BL31_INIT_SITES:
+        raise SystemExit("output BL31 source sites changed")
+    stub_str = orig_bl31.find(BL31_STUB_STRING)
+    if stub_str < 0:
+        raise SystemExit("output BL31 stub string missing")
+    stub_rel = (stub_str + 3) & ~3
+    for site in sites:
+        instr = struct.unpack_from("<I", out_bl31, site + 4)[0]
+        if (instr & 0xFC000000) != 0x94000000:
+            raise SystemExit("output BL31 entry is not a BL")
+        imm = instr & 0x3FFFFFF
+        if imm & 0x2000000:
+            imm -= 0x4000000
+        if site + 4 + 4 * imm != stub_rel:
+            raise SystemExit("output BL31 stub target mismatch")
+    if out_bl31[stub_rel:stub_rel + len(BL31_STUB)] != BL31_STUB:
+        raise SystemExit("output BL31 stub missing")
+    expected = set()
+    for site in sites:
+        expected.update(range(site + 4, site + 8))
+    expected.update(range(stub_rel, stub_rel + len(BL31_STUB)))
+    diffs = [i for i in range(size) if out_bl31[i] != orig_bl31[i]]
+    if diffs != sorted(expected):
+        raise SystemExit("output BL31 has unexpected changes")
+    print(f"  output BL31 MPAM patch OK ({len(diffs)} bytes changed)")
 
 
 def ffs_header_checksum_ok(fv, off):
@@ -472,7 +690,7 @@ def verify_ffs(fv, label):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Build the current custom KP920 BIOS image (1.0-3).",
+        description=f"Build the current custom KP920 BIOS image ({CUSTOM_VERSION_TAG}).",
         epilog=f"default output: firmware/modified/{OUTPUT_NAME}",
     )
     ap.add_argument(
@@ -528,6 +746,9 @@ def main():
     img[off:off + len(HOB_VERSION_COPY_NEW)] = HOB_VERSION_COPY_NEW
     print(f"VersionInfoPeim version copy length: 4 -> {HOB_VERSION_COPY_LEN}")
 
+    # --- initialize MPAM in BL31 so arm64.nompam is not needed ---
+    bl31_base, bl31_size = patch_mpam_bl31(img)
+
     # --- check outer structures ---
     if img[FV2_OFF + 0x28:FV2_OFF + 0x2C] != b"_FVH":
         raise SystemExit("FV2 signature missing")
@@ -555,6 +776,10 @@ def main():
     if inner_fv[0x28:0x2C] != b"_FVH":
         raise SystemExit("inner FV signature missing")
     verify_ffs(inner_fv, "inner FV (original)")
+
+    # --- hide the broken DDRC PMU devices from the OS ---
+    patch_ddrc_hids(inner_fv)
+    verify_ddrc_hids(inner_fv, "inner FV (DSDT)")
 
     # --- replace the boot logo first (it grows the inner FV) ---
     inner_fv, boot_logo_off, boot_logo_bytes = patch_boot_logo(inner_fv)
@@ -647,6 +872,7 @@ def main():
     out_inner_fv = out_inner[0x80:0x80 + out_fv_len]
     verify_ffs(out_inner_fv, "inner FV (dual output)")
     verify_fv_block_map(out_inner_fv, "inner FV (dual output)")
+    verify_ddrc_hids(out_inner_fv, "inner FV (dual output)")
     if out_inner_fv[boot_logo_off:boot_logo_off + len(boot_logo_bytes)] != boot_logo_bytes:
         raise SystemExit("output is missing the boot logo replacement")
     print("output boot logo matches the generated BMP")
@@ -667,6 +893,10 @@ def main():
     if new_pe2 != new_pe:
         raise SystemExit("dual output: new 2.10 PE mismatch")
     print("dual output: old 1.68 PE unchanged; new post-SoC15 PE matches")
+    verify_mpam_bl31(out, orig_img)
+    if out[:0x800000] != orig_img[:0x800000]:
+        raise SystemExit("output changed the first 8 MiB")
+    print("output first 8 MiB unchanged; BL31 MPAM patch verified")
 
     # difference bounds
     diffs = [i for i in range(len(orig_img)) if orig_img[i] != out[i]]
@@ -681,6 +911,7 @@ def main():
         (HOB_VERSION_OFF, HOB_VERSION_OFF + HOB_VERSION_PATCH_LEN),
         (HOB_VERSION_COPY_OFF, HOB_VERSION_COPY_OFF + len(HOB_VERSION_COPY_NEW)),
         (OUTER_FFS_OFF, OUTER_FFS_OFF + max(OUTER_FFS_SIZE, new_ffs_size)),
+        (bl31_base, bl31_base + bl31_size),
     ]
     for i in diffs:
         if not any(a <= i < b for a, b in allowed):

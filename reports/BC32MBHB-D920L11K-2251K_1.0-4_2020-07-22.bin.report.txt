@@ -1,5 +1,5 @@
         Type         |        Subtype        |   Base   |   Size   |  CRC32   |   Name 
- Image               | UEFI                  | 00000000 | 01000000 | D470EEB2 |  UEFI image
+ Image               | UEFI                  | 00000000 | 01000000 | 07C4BAB7 |  UEFI image
  Padding             | Non-empty             | 00000000 | 00800000 | A32AB641 | - Padding
  Volume              | FFSv2                 | 00800000 | 00060000 | 491640C4 | - 8C8CE578-8A3D-4F1C-9935-896185C32DD3
  File                | Pad                   | 00800048 | 00000FA0 | 0494AD4C | -- Padding file
@@ -7,7 +7,7 @@
  Section             | Raw                   | 00801000 | 00000734 | 87036F7E | --- Raw section
  Section             | TE image              | 00801734 | 000530CC | A42C1EF0 | --- TE image section
  Free space          |                       | 00854800 | 0000B800 | 97392C91 | -- Volume free space
- Volume              | FFSv2                 | 00860000 | 00320000 | 87763F5F | - 8C8CE578-8A3D-4F1C-9935-896185C32DD3
+ Volume              | FFSv2                 | 00860000 | 00320000 | 59FD97D9 | - 8C8CE578-8A3D-4F1C-9935-896185C32DD3
  File                | Freeform              | 00860048 | 0000002C | EBCA0E03 | -- 1B45CC0A-156A-428A-AF62-49864DA0E6E6 | PEI apriori file
  Section             | Raw                   | 00860060 | 00000014 | 9DA8B7BD | --- Raw section
  File                | Freeform              | 00860078 | 00000408 | A8B87D3A | -- 02923561-E750-45B2-A391-16D5F6822D78
@@ -53,10 +53,10 @@
  Section             | TE image              | 008916BC | 000063A4 | AEC4B5EC | --- TE image section
  Section             | UI                    | 00897A60 | 00000024 | AB909025 | --- UI section
  File                | Pad                   | 00897A88 | 00000060 | D9EA0359 | -- Padding file
- File                | PEI module            | 00897AE8 | 0000555C | 145ADC85 | -- F414EE11-EEE3-4EDC-8C12-0E80E446A849 | VersionInfoPeim
+ File                | PEI module            | 00897AE8 | 0000555C | CDF32E37 | -- F414EE11-EEE3-4EDC-8C12-0E80E446A849 | VersionInfoPeim
  Section             | PEI dependency        | 00897B00 | 00000016 | 99E93E7C | --- PEI dependency section
  Section             | Raw                   | 00897B18 | 00000004 | CA4DE08B | --- Raw section
- Section             | TE image              | 00897B1C | 00005504 | FE0A7BF4 | --- TE image section
+ Section             | TE image              | 00897B1C | 00005504 | F199B352 | --- TE image section
  Section             | UI                    | 0089D020 | 00000024 | AB3847CD | --- UI section
  File                | Pad                   | 0089D048 | 00000020 | 954C73DF | -- Padding file
  File                | PEI module            | 0089D068 | 00007F34 | 3D832D7F | -- 6FD1D076-0DAF-4E92-8644-85D7C7D9AA3B | SpiInitPeim
@@ -102,11 +102,11 @@
  Section             | UI                    | 00983320 | 00000012 | 3A14057A | --- UI section
  File                | Freeform              | 00983338 | 00000434 | 21613786 | -- A2D20CE3-7285-4A96-8B70-F7518837073B
  Section             | Raw                   | 00983350 | 0000041C | 26145543 | --- Raw section
- File                | Volume image          | 00983770 | 001EDD7B | F2D5BC7C | -- 9E21FD93-9C72-4C15-8C4B-E77F1DB2D792
- Section             | GUID defined          | 00983788 | 001EDD63 | 7C7BB1BE | --- EE4E5898-3914-4259-9D6E-DC7BD79403CF
+ File                | Volume image          | 00983770 | 001EDFD8 | E613F4C3 | -- 9E21FD93-9C72-4C15-8C4B-E77F1DB2D792
+ Section             | GUID defined          | 00983788 | 001EDFC0 | 1C488F4C | --- EE4E5898-3914-4259-9D6E-DC7BD79403CF
  Section             | Raw                   |   N/A    | 0000007C | 3A3CD69B | ---- Raw section
- Section             | Volume image          |   N/A    | 00E8E444 | 2BBDCEC5 | ---- Volume image section
- Volume              | FFSv2                 |   N/A    | 00E8E440 | 9DF883C8 | ----- 8C8CE578-8A3D-4F1C-9935-896185C32DD3
+ Section             | Volume image          |   N/A    | 00E8E444 | 80EF71A1 | ---- Volume image section
+ Volume              | FFSv2                 |   N/A    | 00E8E440 | 36AA3CAC | ----- 8C8CE578-8A3D-4F1C-9935-896185C32DD3
  File                | Freeform              |   N/A    | 0000002C | C9F0BB15 | ------ FC510EE7-FFDC-11D4-BD41-0080C73C8881 | DXE apriori file
  Section             | Raw                   |   N/A    | 00000014 | 9CC064EF | ------- Raw section
  File                | DXE core              |   N/A    | 00051830 | 7741B326 | ------ D6A2CB7F-6A18-4E2F-B43B-9920A733700A | DxeCore
@@ -331,14 +331,14 @@
  Section             | DXE dependency        |   N/A    | 0000003A | EF0C55EF | ------- DXE dependency section
  Section             | PE32 image            |   N/A    | 0000B4C4 | E6670680 | ------- PE32 image section
  Section             | UI                    |   N/A    | 0000001E | 696FE4FF | ------- UI section
- File                | Freeform              |   N/A    | 0000BF7C | E44F3DE8 | ------ 7E374E25-8E01-4FEE-87F2-390C23C606CD
+ File                | Freeform              |   N/A    | 0000BF7C | EFEA6833 | ------ 7E374E25-8E01-4FEE-87F2-390C23C606CD
  Section             | Raw                   |   N/A    | 000001A4 | EA370D4C | ------- Raw section
  Section             | Raw                   |   N/A    | 00000264 | E52118A2 | ------- Raw section
  Section             | Raw                   |   N/A    | 000001E4 | A8AC4180 | ------- Raw section
  Section             | Raw                   |   N/A    | 000001A4 | 01B7EEF3 | ------- Raw section
  Section             | Raw                   |   N/A    | 000001A4 | D703D7C5 | ------- Raw section
  Section             | Raw                   |   N/A    | 00002A04 | B7C96675 | ------- Raw section
- Section             | Raw                   |   N/A    | 00007EEB | 85ADEC09 | ------- Raw section
+ Section             | Raw                   |   N/A    | 00007EEB | F1E246D0 | ------- Raw section
  Section             | Raw                   |   N/A    | 000007AC | 4729D8AC | ------- Raw section
  Section             | Raw                   |   N/A    | 00000594 | 88E43751 | ------- Raw section
  File                | DXE driver            |   N/A    | 00007D0E | DE9641C0 | ------ 65766562-49E7-11E8-817F-286ED489EE9B | AcpiPptt
@@ -628,13 +628,13 @@
  File                | DXE driver            |   N/A    | 00018E6C | EC7B8B57 | ------ 92F10585-FB63-430F-8188-71FEEB2DDA5B | ARM64Gop 2.10
  Section             | PE32 image            |   N/A    | 00018E34 | DEDBC815 | ------- PE32 image section
  Section             | UI                    |   N/A    | 00000020 | DC0C2A2C | ------- UI section
- Free space          |                       | 00B714F0 | 0000EB10 | E090E7DE | -- Volume free space
+ Free space          |                       | 00B71748 | 0000E8B8 | B147E6AF | -- Volume free space
  Volume              | FFSv2                 | 00B80000 | 00010000 | F5496A8D | - 91CD0863-E0D7-481E-AAA5-1DCA656A560E
  File                | Raw                   | 00B80078 | 000000D6 | 1D1EC519 | -- 21B3566B-53FE-4BCC-B637-5CE5A0CA4F00
  File                | Freeform              | 00B80150 | 000006D4 | 9F546EBE | -- 1AE42876-008F-4161-B2B7-1C0D15C5EF43
  Section             | Raw                   | 00B80168 | 000006BC | 8A5E082A | --- Raw section
  Free space          |                       | 00B80828 | 0000F7D8 | 1CAE2C1F | -- Volume free space
- Padding             | Non-empty             | 00B90000 | 00040000 | 96DD72B5 | - Padding
+ Padding             | Non-empty             | 00B90000 | 00040000 | DD736CF6 | - Padding
  Volume              | NVRAM                 | 00BD0000 | 00020000 | 85903B21 | - FFF12B8D-7696-4C8B-A985-2747075B4F50
  VSS2 store          |                       | 00BD0048 | 0000DFB8 | 2392BEC6 | -- VSS2 store
  VSS entry           | Auth                  | 00BD0064 | 0000004B | 038B28C4 | --- EC87D643-EBA4-4BB5-A1E5-3F3E36B20DA9 | Setup
@@ -778,4 +778,4 @@
  Free space          |                       | 00BD7028 | 00006FD8 | 359E2E57 | --- Free space
  FTW store           |                       | 00BDE000 | 00002000 | C52A248F | -- FTW store
  Free space          |                       | 00BE0000 | 00010000 | DEAB7E4E | -- Free space
- Padding             | Non-empty             | 00BF0000 | 00410000 | 9E2085D5 | - Padding
+ Padding             | Non-empty             | 00BF0000 | 00410000 | 66F25B3A | - Padding
