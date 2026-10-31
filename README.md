@@ -140,6 +140,8 @@ python3 scripts/rebuild_bios.py
 - 默认 LOGO：`images/Huawei-Logo.bmp`（840x260 24-bit，4:3→16:9 预补偿）
 - 固定输出：`firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin`
 - SHA-256：`b6916035b2c7d5f84e537a6d38972dcd77a32f7c02d5a0806f6b3f30b37be19e`
+- `firmware/modified/` 是构建产物目录，已在 `.gitignore` 中排除，
+  不纳入 git；需要时运行脚本重新生成。
 
 说明：
 
