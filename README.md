@@ -6,6 +6,21 @@ POST/Setup 显示，同时保留原厂 **Radeon 520**（Polaris）的 BIOS 显�
 并修复 DDRC PMU 与 MPAM 两个固件问题，使 Linux 不再需要
 `arm64.nompam` / `initcall_blacklist=hisi_ddrc_pmu_module_init`。
 
+## 实机展示
+
+Huawei 开机 LOGO（Vega 20，DP 1024x768）：
+
+<p align="center">
+  <img src="images/Huawei-Logo-screenshot.jpg" width="70%" alt="Huawei 开机 LOGO 实拍">
+</p>
+
+系统正常启动（`/proc/cmdline` 已去掉 `arm64.nompam` 和
+`initcall_blacklist`；Radeon Pro VII / MI50 32GB 已由 amdgpu 识别）：
+
+<p align="center">
+  <img src="images/AMD-Radeon-Pro-VII-params.png" width="70%" alt="系统启动与 Radeon Pro VII 显卡">
+</p>
+
 ## 1. 当前定制版本：1.0-4
 
 当前只有一个定制版本：
@@ -222,3 +237,23 @@ uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin" rep
 
 - `docs/FLASH_GUIDE.md`：刷写步骤、结果判断、回退方法。
 - `docs/KP920_VEGA20_BIOS_NOTES.md`：完整分析、固件偏移、构建方式与实机验证记录。
+
+## 8. 版权与合理使用声明
+
+以下原厂/第三方资源版权归原作者/权利人所有，此处仅用于教育/演示目的，基于合理使用原则（Fair Use）：
+
+- `firmware/original/BC32MBHB-D920L11K-2251K_1.0_2020-07-22.bin`（BC32MBHB / D920L11K-2251K 原厂 BIOS 镜像 1.0）版权归华为技术有限公司（Huawei Technologies Co., Ltd.）所有；镜像中包含的 Byosoft、EDK2 等第三方组件版权归各自权利人所有。此处仅用于教育/演示目的，基于合理使用原则（Fair Use）。
+- `reference/AMD.RadeonProVII.16384.200818.rom`（AMD Radeon Pro VII / Radeon Instinct MI50，Vega 20，VBIOS `113-D1640600-104`）版权归 Advanced Micro Devices, Inc.（AMD）所有，此处仅用于教育/演示目的，基于合理使用原则（Fair Use）。
+- `reference/vbios.rom`（上述 AMD Radeon Pro VII VBIOS 的前 104,448 字节截取副本）版权归 Advanced Micro Devices, Inc.（AMD）所有，此处仅用于教育/演示目的，基于合理使用原则（Fair Use）。
+- `drivers/Arm64Gop_1_68.efi`（AMD ARM64 GOP 驱动 1.68）版权归 Advanced Micro Devices, Inc.（AMD）所有，此处仅用于教育/演示目的，基于合理使用原则（Fair Use）。
+- `drivers/ARM64Gop_2_10.efi`（AMD ARM64 GOP 驱动 2.10）版权归 Advanced Micro Devices, Inc.（AMD）所有，此处仅用于教育/演示目的，基于合理使用原则（Fair Use）。
+
+## 9. 许可证
+
+除第 8 节列出的第三方资源外，本项目原创的脚本、文档和构建代码采用
+**DO WHATEVER PUBLIC LICENSE（DWPL）** 授权（许可证文本由 Justin Lloyd
+发布，原作者主页：`http://otakunozoku.com/`）：
+
+- 许可证全文：[`LICENSE`](LICENSE)
+- 允许复制、修改、分发和商业使用，不提供任何担保。
+- 第三方资源不适用本许可证，其版权仍归各自权利人所有。
