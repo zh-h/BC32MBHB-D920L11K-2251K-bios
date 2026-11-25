@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
-"""Build the current custom KP920 BIOS image (1.0-4).
+"""Build the current custom KP920 BIOS image (1.0-5).
 
 Output filename::
 
-    BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin
+    BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin
 
-1.0 is the stock BIOS Version and 4 is the custom revision.  The revision is
+1.0 is the stock BIOS Version and 5 is the custom revision.  The revision is
 bumped as the modifications evolve; it is not a menu of alternative images.
 
-1.0-4 keeps the stock 1.68 pre-SoC15 Arm64Gop FFS (Radeon 520) byte-for-byte
-and appends a post-SoC15 2.10 Arm64Gop FFS (Vega 20) to the inner DXE FV.
+1.0-5 keeps the stock 1.68 pre-SoC15 Arm64Gop FFS (Radeon 520) byte-for-byte,
+appends the signed post-SoC15 2.10 Arm64Gop FFS (Vega 20), and appends the
+signed AMD AArch64 GOP 3.1.0 extracted from the Sapphire RX 6600 VBIOS
+(Navi 23, 1002:73FF) to the inner DXE FV.  Both appended PEs are unmodified
+AMD Authenticode images (Microsoft UEFI CA 2011 chain).
 It also replaces the 300x95 boot logo with the generated Huawei logo.
 The DSDT HISI0233 DDRC PMU HIDs are renamed to HISI9999 so that
 hisi_uncore_ddrc_pmu does not bind (it hangs reading DDRC_VERSION here).
 The BL31 entry code in the FIP is patched to initialize MPAM3_EL3, so
 Linux no longer needs arm64.nompam.
-The firmware's BIOS Version field is changed from 1.0 to 1.0-4;
+The firmware's BIOS Version field is changed from 1.0 to 1.0-5;
 the EC version (0.23) is left untouched.
 
 Only the compressed DXE FV's outer FFS file is rebuilt.  FFS header checksums
@@ -31,9 +34,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Current (single) custom version: stock BIOS Version 1.0 + custom build 4.
+# Current (single) custom version: stock BIOS Version 1.0 + custom build 5.
 STOCK_BIOS_VERSION = "1.0"
-CUSTOM_VERSION = 4
+CUSTOM_VERSION = 5
 BUILD_DATE = "2020-07-22"
 IMAGE_STEM = "BC32MBHB-D920L11K-2251K"
 CUSTOM_VERSION_TAG = f"{STOCK_BIOS_VERSION}-{CUSTOM_VERSION}"
@@ -124,6 +127,15 @@ POST_GOP_UI_NAME = "ARM64Gop 2.10"
 DEFAULT_GOP210 = str(ROOT / "drivers" / "ARM64Gop_2_10.efi")
 ARM64GOP_2_10_SHA = "c0b47fe3a16718666565e0a19a9d85d0eccbff2a8c71145cc082a5abc6bb4259"
 ORIG_168_PE_SHA = "22021e0a5a47cff0d48dd86161eb540a786604898b81da41c8b06983f762372f"
+
+# RX 6600 (Navi 23, 1002:73FF) GOP extracted from the card's VBIOS EFI image.
+# It is an unmodified AMD Authenticode PE (Microsoft UEFI CA 2011 chain);
+# keep it byte-for-byte and only wrap it in a new FFS.
+RX6600_GOP_FFS_GUID = uuid.UUID("7e3c9b1a-5d42-4f86-a0c7-2b9e8d1f4a63")
+RX6600_GOP_UI_NAME = "ARM64Gop 3.1.0 RX6600"
+DEFAULT_GOP310 = str(ROOT / "drivers" / "ARM64Gop_3_1_0.efi")
+ARM64GOP_3_1_0_SHA = "e84a703d0e97240aeaa4acec406bb9c2ad4d901a08d33e41f8f93b9eec0032fc"
+ARM64GOP_3_1_0_SIZE = 0x11A40
 
 FILTERS = [{
     "id": lzma.FILTER_LZMA1,
@@ -688,6 +700,26 @@ def verify_ffs(fv, label):
     print(f"  {label}: {n} FFS files, checksums OK")
 
 
+def verify_signed_pe(pe, label):
+    """Validate that a GOP PE is an unmodified signed AArch64 PE32+ image."""
+    if pe[:2] != b"MZ":
+        raise SystemExit(f"{label}: not an MZ image")
+    pe_off = struct.unpack_from("<I", pe, 0x3C)[0]
+    if pe[pe_off:pe_off + 4] != b"PE\0\0":
+        raise SystemExit(f"{label}: PE signature missing")
+    if struct.unpack_from("<H", pe, pe_off + 4)[0] != 0xAA64:
+        raise SystemExit(f"{label}: not an AArch64 PE")
+    if struct.unpack_from("<H", pe, pe_off + 24)[0] != 0x20B:
+        raise SystemExit(f"{label}: not a PE32+ image")
+    sec_off, sec_size = struct.unpack_from("<II", pe, pe_off + 0xA8)
+    if sec_off == 0 or sec_size == 0 or sec_off + sec_size > len(pe):
+        raise SystemExit(f"{label}: missing or truncated certificate table")
+    cert_len, cert_rev, cert_type = struct.unpack_from("<IHH", pe, sec_off)
+    if cert_len != sec_size or cert_rev != 0x0200 or cert_type != 0x0002:
+        raise SystemExit(f"{label}: unexpected WIN_CERTIFICATE header")
+    print(f"  {label}: signed AArch64 PE, certificate {sec_off:#x}/{sec_size:#x}")
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=f"Build the current custom KP920 BIOS image ({CUSTOM_VERSION_TAG}).",
@@ -701,6 +733,11 @@ def main():
         "--gop210",
         default=DEFAULT_GOP210,
         help="post-SoC15 2.10 GOP PE (default: drivers/ARM64Gop_2_10.efi)",
+    )
+    ap.add_argument(
+        "--gop310",
+        default=DEFAULT_GOP310,
+        help="RX 6600 AArch64 GOP PE (default: drivers/ARM64Gop_3_1_0.efi)",
     )
     ap.add_argument(
         "--out",
@@ -807,14 +844,37 @@ def main():
 
     new_ffs = build_gop_ffs(new_pe, post_guid_str, POST_GOP_UI_NAME)
     new_fv, insert = append_ffs_to_fv(inner_fv, new_ffs)
-    verify_ffs(new_fv, "inner FV (dual)")
-    verify_fv_block_map(new_fv, "inner FV (dual)")
-    final_stream = replace_stream_fv(inner_stream, new_fv)
+    verify_ffs(new_fv, "inner FV (2.10)")
+    verify_fv_block_map(new_fv, "inner FV (2.10)")
     print(
-        f"dual GOP: old 1.68 FFS @ inner {old_off:#x} (PE "
+        f"2.10 GOP: old 1.68 FFS @ inner {old_off:#x} (PE "
         f"{hashlib.sha256(old_pe).hexdigest()[:16]}...); "
         f"new FFS @ inner {insert:#x}, size {len(new_ffs):#x}, "
         f"GUID {post_guid_str}, name {POST_GOP_UI_NAME!r}; "
+        f"inner FV {len(new_fv):#x}"
+    )
+
+    # --- append the signed RX 6600 (Navi 23) GOP as a third driver ---
+    rx_pe = open(args.gop310, "rb").read()
+    rx_sha = hashlib.sha256(rx_pe).hexdigest()
+    if len(rx_pe) != ARM64GOP_3_1_0_SIZE:
+        raise SystemExit(f"unexpected --gop310 size {len(rx_pe):#x}")
+    if rx_sha != ARM64GOP_3_1_0_SHA:
+        raise SystemExit(f"--gop310 SHA mismatch: {rx_sha}")
+    verify_signed_pe(rx_pe, "RX6600 GOP")
+
+    rx_guid_str = str(RX6600_GOP_FFS_GUID)
+    if any(g == rx_guid_str for _, _, g in iter_ffs(new_fv)):
+        raise SystemExit("image already contains the RX6600 GOP FFS")
+
+    rx_ffs = build_gop_ffs(rx_pe, rx_guid_str, RX6600_GOP_UI_NAME)
+    new_fv, rx_insert = append_ffs_to_fv(new_fv, rx_ffs)
+    verify_ffs(new_fv, "inner FV (RX6600)")
+    verify_fv_block_map(new_fv, "inner FV (RX6600)")
+    final_stream = replace_stream_fv(inner_stream, new_fv)
+    print(
+        f"RX6600 GOP: FFS @ inner {rx_insert:#x}, size {len(rx_ffs):#x}, "
+        f"GUID {rx_guid_str}, name {RX6600_GOP_UI_NAME!r}; "
         f"inner FV {len(new_fv):#x}"
     )
 
@@ -888,11 +948,15 @@ def main():
     print(f"output BIOS version fields are {CUSTOM_VERSION_TAG}")
     old_pe2 = pe_of_ffs(out_inner_fv, str(ARM_GOP_GUID))
     new_pe2 = pe_of_ffs(out_inner_fv, post_guid_str)
+    rx_pe2 = pe_of_ffs(out_inner_fv, rx_guid_str)
     if old_pe2 != old_pe:
-        raise SystemExit("dual output: old 1.68 PE changed")
+        raise SystemExit("output: old 1.68 PE changed")
     if new_pe2 != new_pe:
-        raise SystemExit("dual output: new 2.10 PE mismatch")
-    print("dual output: old 1.68 PE unchanged; new post-SoC15 PE matches")
+        raise SystemExit("output: new 2.10 PE mismatch")
+    if rx_pe2 != rx_pe:
+        raise SystemExit("output: RX6600 3.1.0 PE mismatch")
+    verify_signed_pe(rx_pe2, "output RX6600 GOP")
+    print("output: 1.68 unchanged; 2.10 matches; RX6600 3.1.0 signed PE matches")
     verify_mpam_bl31(out, orig_img)
     if out[:0x800000] != orig_img[:0x800000]:
         raise SystemExit("output changed the first 8 MiB")

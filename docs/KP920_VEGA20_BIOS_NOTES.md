@@ -6,45 +6,49 @@
 - 显卡：AMD **Vega 20**（Radeon Pro VII / Instinct MI50），PCI ID `1002:66A1`
 - VBIOS：`113-D1640600-104`，104448 字节
 - 目标：只修改主板 BIOS（不改显卡 VBIOS），让 Vega 20 在 BIOS POST/Setup 显示
-- 当前定制版本：**1.0-4**
-  `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin`
-  （SHA-256 `b6916035b2c7d5f84e537a6d38972dcd77a32f7c02d5a0806f6b3f30b37be19e`）
+- 当前定制版本：**1.0-5**
+  `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin`
+  （SHA-256 `ee17e1eb761d658e7e0c9104ac7dcefade8156a90ac826329616489ad3027c77`）
 
-状态：GOP 方案已实机验证（Radeon 520、Vega 20 的 BIOS POST/Setup 显示均正常；
-Vega 20 下固件通过 GOP 交接 `simple-framebuffer`，随后 amdgpu 接管）。
+状态：Radeon 520 / Vega 20 的 GOP 方案已实机验证；1.0-5 新增 RX 6600
+（Navi 23，`1002:73FF`）的 3.1.0 AArch64 GOP，**待实机验证**。
+Vega 20 下固件通过 GOP 交接 `simple-framebuffer`，随后 amdgpu 接管。
 1.0-4 的开机 LOGO 已实机验证：840x260 预补偿版显示正常、比例/大小合适。
 DDRC ACPI 修复已实机验证：DSDT 中 DDRC 设备变为 `HISI9999`，
 去掉 `initcall_blacklist=hisi_ddrc_pmu_module_init` 可正常启动。
 BL31 MPAM 修复已实机验证：从 U 盘启动，GRUB 去掉
 `arm64.nompam` 和 `initcall_blacklist=hisi_ddrc_pmu_module_init`
 可正常启动。
-BIOS Version 字段已改为 `1.0-4`；EC 0.23 保持原厂。
+1.0-5 的 BIOS Version 字段预期为 `1.0-5`；EC 0.23 保持原厂。
 RX 5700 XT 因在 Kunpeng 上 PCIe 不枚举，不支持。
 
 ---
 
-## 1. 当前定制版本 1.0-4
+## 1. 当前定制版本 1.0-5
 
 文件名格式：
 
 ```
-BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin
+BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin
 ```
 
-原厂 **BIOS Version 是 `1.0`**；`1.0-4` 表示在原厂 1.0 上做第 4 个本地
-定制构建，固件内 BIOS Version 字段也改为 `1.0-4`。
+原厂 **BIOS Version 是 `1.0`**；`1.0-5` 表示在原厂 1.0 上做第 5 个本地
+定制构建，固件内 BIOS Version 字段也改为 `1.0-5`。
 
-1.0-4 的改动：
+1.0-5 的改动（在 1.0-4 基础上）：
 
 - 保留原厂 1.68 pre-SoC15 `Arm64Gop` FFS **字节不变**，负责 Radeon 520 / Polaris；
 - 在 inner DXE FV 末尾追加 post-SoC15 2.10 `Arm64Gop` FFS
   （GUID `92F10585-FB63-430F-8188-71FEEB2DDA5B`，UI 名 `ARM64Gop 2.10`），
   负责 Vega 20；
+- 再追加 3.1.0 AArch64 GOP FFS（GUID `7E3C9B1A-5D42-4F86-A0C7-2B9E8D1F4A63`，
+  UI 名 `ARM64Gop 3.1.0 RX6600`），从 Sapphire RX 6600 VBIOS 的 AArch64
+  EFI 镜像解压得到，PE 字节和 AMD 签名保持原样，负责 Navi 23 / RX 6600；
 - 把开机 LOGO 从原 PowerLeader `300x95` BMP 替换为 Huawei LOGO
   （`images/Huawei-Logo.bmp`，`840x260` 24-bit，内容 `820x240`，
   黑底白字 + 红色花瓣）；LOGO FFS 扩容并重建 inner FV；
-- 两个 PE 都保留 AMD 签名；
-- **BIOS Version 字段 `1.0` → `1.0-4`**（版本信息块绝对 `0xBF0098`）；
+- 三个 PE（1.68 / 2.10 / 3.1.0）都保留 AMD 签名；
+- **BIOS Version 字段 `1.0` → `1.0-5`**（版本信息块绝对 `0xBF0098`）；
   EC 版本 `0.23` 保持不变；
 - **DDRC PMU ACPI 修复**：DSDT 中 4 个 `HISI0233`（`\_SB.DDR0..DDR3`）
   改为 `HISI9999` 并重算 DSDT 校验和；`hisi_uncore_ddrc_pmu` 不再匹配，
@@ -59,12 +63,12 @@ BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin
 
 - EC 版本 `0.23`：独立嵌入式控制器固件，Setup 从 EC 读取，不随本镜像改变；
 - 内核版本 `v2.70`：另一个内部组件版本，不是 BIOS Version；
-- BIOS Version `1.0-4`：主 BIOS 固件版本，由原厂 `1.0` 改为 `1.0-4`；
-  `dmidecode -s bios-version` 已实机确认显示 `1.0-4`。
+- BIOS Version `1.0-5`：主 BIOS 固件版本，由原厂 `1.0` 改为 `1.0-5`；
+  1.0-4 已实机确认 `dmidecode -s bios-version` 显示 `1.0-4`，1.0-5 待验证。
 
-版本号更新只需改 `scripts/rebuild_bios.py` 的 `CUSTOM_VERSION`（当前 4）；
+版本号更新只需改 `scripts/rebuild_bios.py` 的 `CUSTOM_VERSION`（当前 5）；
 脚本会自动更新文件名、BIOS Version 块（`0xBF0098`）、VersionInfoPeim
-默认版本字符串和复制长度。标签需小于 8 字符（如 `1.0-4`、`1.0-10`）。
+默认版本字符串和复制长度。标签需小于 8 字符（如 `1.0-5`、`1.0-10`）。
 
 ---
 
@@ -159,7 +163,7 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 | Arm64Gop FFS（1.68） | 内层 FV 相对偏移 `0x9A51B8`，size `0x216F2`，type `0x07` |
 | Arm64Gop PE32（1.68） | section body 偏移 `0x91A054`，大小 `0x216C0`（136896 字节） |
 
-### 4.3 1.0-4 追加的 2.10 FFS
+### 4.3 1.0-4 追加的 2.10 FFS（1.0-5 保留）
 
 | 项 | 值 |
 |---|---|
@@ -175,14 +179,14 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 
 ### 4.4 BIOS Version 字段修改
 
-- 版本信息块绝对 `0xBF0098`：8 字节字段 `1.0` → `1.0-4`
-  （`31 2e 30 00 00 00 00 00` → `31 2e 30 2d 34 00 00 00`）。
+- 版本信息块绝对 `0xBF0098`：8 字节字段 `1.0` → `1.0-5`
+  （`31 2e 30 00 00 00 00 00` → `31 2e 30 2d 35 00 00 00`）。
 - VersionInfoPeim 的默认 BIOS Version 字符串 `1.0`（绝对 `0x89B144`）
-  改为 `1.0-4`；同处构建 HOB 时只复制 4 字节，已把复制长度指令
+  改为 `1.0-5`；同处构建 HOB 时只复制 4 字节，已把复制长度指令
   （绝对 `0x897D2C`，`mov x2, #4`）改为 `mov x2, len(tag)+1`，
   修复 `1.0-` 截断。
 - 该 HOB 是 Setup 动态 BIOS Version 和 SMBIOS Type 0 BIOS Version 的来源；
-  `dmidecode -s bios-version` 已实机确认显示 `1.0-4`。
+  1.0-4 已实机确认 `dmidecode -s bios-version` 显示 `1.0-4`，1.0-5 待验证。
 - EC 版本字段绝对 `0xBF0058` 保持 `0.23`；EC 版本由 PlatformSetupDxe
   通过 `Get EC Version` 从 EC 读取，和 BIOS 字符串无关。
 - 内核版本 `v2.70` 及 BIOS Revision/Firmware Revision `0.23` 不做修改。
@@ -190,7 +194,7 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
   标题和 BIOS Version 字段是两套独立字符串，本次只改 HOB/BIOS Version
   字段。此前尝试扩展 HII 标题包未能达到预期，相关改动已全部撤销。
 
-### 4.5 1.0-4 开机 LOGO 替换
+### 4.5 1.0-4 开机 LOGO 替换（1.0-5 保留）
 
 | 项 | 值 |
 |---|---|
@@ -303,9 +307,9 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 
 ---
 
-## 6. 1.0-4 的构建方式
+## 6. 1.0-5 的构建方式
 
-`scripts/rebuild_bios.py` 默认（也是唯一）构建当前版本 1.0-4：
+`scripts/rebuild_bios.py` 默认（也是唯一）构建当前版本 1.0-5：
 
 1. 读取原厂镜像，校验 SHA-256 为原厂镜像，检查 FV2/外层 FFS/GUIDed LZMA
    section 结构。
@@ -315,23 +319,27 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 3. 解压 inner LZMA stream，定位 DSDT，把 4 个 `HISI0233` 改为 `HISI9999`，
    重算 DSDT checksum（§4.6）；定位原 1.68 Arm64Gop FFS（inner `0x9A51B8`，
    size `0x216F2`），确认 PE SHA 为 `22021e0a...`，**字节不变**。
-4. 把版本信息块 BIOS Version 字段 `1.0` 改为 `1.0-4`（§4.4）；替换/扩容
+4. 把版本信息块 BIOS Version 字段 `1.0` 改为 `1.0-5`（§4.4）；替换/扩容
    开机 LOGO（§4.5），后续 FFS 按原有 `0x80` 对齐整体平移；EC 版本
    `0.23` 不变。
 5. 新建 2.10 FFS（GUID `92F10585-...`，UI `ARM64Gop 2.10`）：
-   PE32 section `0x10` + UI section `0x15`，FFS 大小 `0x18E6C`。
-6. 追加到 inner FV 最后一个文件的对齐末尾 `0xE755B8`；FV 长度按块表 `0x40`
-   对齐到 `0xE8E440`，block map `0x3A391 × 0x40`，重算 FV header checksum。
+   PE32 section `0x10` + UI section `0x15`，FFS 大小 `0x18E6C`；
+   追加到 inner FV 末尾 `0xE755B8`。
+6. 新建 3.1.0 RX6600 FFS（GUID `7E3C9B1A-...`，UI `ARM64Gop 3.1.0 RX6600`，
+   PE `0x11A40`，FFS `0x11A8C`），追加到 2.10 之后的 `0xE8E428`；
+   FV 长度按块表 `0x40` 对齐到 `0xE9FEC0`，block map `0x3A7FB × 0x40`，
+   重算 FV header checksum。
 7. 重新压缩 inner stream（LZMA1，lc=3/lp=0/pb=2，dict 16 MiB），重建外层
    GUIDed/LZMA section 和 FFS，更新外层 FFS size/checksum，释放尾部填 `0xFF`。
-   本次 outer section `0x1EDFC0`、outer FFS `0x1EDFD8`，FV2 余量
-   `0xE8B8`（59,576 字节）。
+   本次 outer section `0x1F3A8A`、outer FFS `0x1F3AA2`，FV2 余量
+   `0x8DEE`（36,334 字节）。
 8. 自检：
-   - 136 个 inner FFS、FV/FFS header checksum；
+   - 137 个 inner FFS、FV/FFS header checksum；
    - block map 乘积等于 FvLength；
    - 旧 1.68 PE SHA `22021e0a...` 不变；
    - 新 2.10 PE SHA `c0b47fe3...`；
-   - BIOS Version 字段为 `1.0-4`；EC 0.23 保持原厂；
+   - 新 3.1.0 PE SHA `e84a703d...`，且 AArch64/PE32+/证书表校验通过；
+   - BIOS Version 字段为 `1.0-5`；EC 0.23 保持原厂；
    - 输出开机 LOGO 与 `images/Huawei-Logo.bmp` 逐字节一致；
    - DSDT 为 4 个 `HISI9999`、0 个 `HISI0233`、checksum 有效、长度不变；
    - BL31 为 2 条正确 BL + stub，恰好 32 字节变化，pattern 不再存在；
@@ -343,7 +351,7 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 
 | 文件 | 大小 | SHA-256 |
 |---|---:|---|
-| `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin` | 16,777,216 | `b6916035b2c7d5f84e537a6d38972dcd77a32f7c02d5a0806f6b3f30b37be19e` |
+| `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin` | 16,777,216 | `ee17e1eb761d658e7e0c9104ac7dcefade8156a90ac826329616489ad3027c77` |
 
 ---
 
@@ -356,8 +364,10 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 - 编程器写完整 16 MiB；SPI 芯片可插拔。
 - 原厂镜像备份 SHA-256：`e900c384175cf424b970163109cfe36829fa0d459fbd99d1af954257f63b3704`。
 
-### 7.2 1.0-4 结果
+### 7.2 1.0-4 结果（历史）与 1.0-5 状态
 
+- **1.0-5 / RX 6600**：新增 3.1.0 AArch64 GOP，**待实机验证**；需回归
+  Radeon 520 / Vega 20，确认没有重复绑定或显示回退。
 - **Radeon 520**：原 1.68 驱动正常显示，行为与原厂一致。
 - **Vega 20**：BIOS POST/Setup 画面正常；内核日志出现
   `simple-framebuffer.0` / `simpledrm`，证明固件 GOP 已初始化并向 OS 交接
@@ -410,7 +420,9 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 ## 8. 风险与限制
 
 - **RX 5700 XT**：2.10 设备表覆盖 Navi 10，但平台 PCIe 不枚举，实际不支持。
-- **RX 6000（RDNA2）**：主流 ID 不在 2.10 设备表内，本次不支持。
+- **RX 6600（RDNA2）**：1.0-5 通过 3.1.0 GOP 支持，待实机验证；3.1.0 的
+  绑定逻辑由 VBIOS 驱动，可能也匹配其他 AMD 显卡，需回归 520 / Vega 20。
+- **其他 RX 6000**：没有对应 VBIOS 提取的 GOP，未验证。
 - **BL31 MPAM 补丁风险**：修改 EL3 代码；写错会导致主板无法启动，只能
   用 SPI 编程器恢复。构建脚本对 FIP/BL31/pattern/stub/diff 做严格校验，
   刷写前保留原厂镜像和当前 SPI 全片备份。
@@ -423,8 +435,8 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
   若实际启用了安全启动，补丁可能被拒绝。刷前保留全片备份，失败用编程器恢复。
 - **内置升级限制**：UpdateFirmware 含 `VerifySignedImage`/`VersionCheck`；
   最终镜像建议用编程器，或刷后读回确认 BL31 已写入。
-- **签名策略**：两个 PE 都保留 AMD 签名；若以后换驱动，需保持签名完整或按
-  平台策略处理。
+- **签名策略**：三个 PE（1.68 / 2.10 / 3.1.0）都保留 AMD 签名；若以后换
+  驱动，需保持签名完整或按平台策略处理。
 - **恢复**：芯片可插拔，原厂镜像 `e900c384...` 可随时用编程器恢复。
 - **刷完整镜像会覆盖 NVRAM**：若 OS 启动项丢失，可在 Setup/Boot Manager
   重新选择或从 ESP 启动。
@@ -434,16 +446,16 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 ## 9. 复现命令
 
 ```bash
-# 构建当前版本 1.0-4（固定输出）
+# 构建当前版本 1.0-5（固定输出）
 python3 scripts/rebuild_bios.py
 
 # 结构检查
-uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin" report
+uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin" report
 ```
 
 > 可重复性：脚本每次都从原厂镜像（`--src` 默认）重建，**不会读取上一次
 > 输出**；同一源镜像、同一驱动和同一 libLZMA 下重复运行输出 SHA-256 相同
-> （本机多次验证为 `b6916035b2c7d5f84e537a6d38972dcd77a32f7c02d5a0806f6b3f30b37be19e`）。
+> （本机 1.0-5 验证为 `ee17e1eb761d658e7e0c9104ac7dcefade8156a90ac826329616489ad3027c77`）。
 > 源镜像只读；写盘在全部自检通过之后才发生。换 Python/liblzma 版本可能改变
 > 压缩字节从而改变哈希，但解压后的内容与结构校验不变。若输出文件已存在且
 > 内容不同，脚本会拒绝覆盖；确认覆盖时加 `--force`。
@@ -455,16 +467,18 @@ uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin" rep
 | 文件 | 用途 |
 |---|---|
 | `firmware/original/BC32MBHB-D920L11K-2251K_1.0_2020-07-22.bin` | 原始固件备份（`e900c384...`） |
-| `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin` | 当前定制版本；Radeon 520 + Vega 20 + DDRC/MPAM 修复（`b6916035...`） |
+| `firmware/modified/BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin` | 当前定制版本；Radeon 520 + Vega 20 + RX 6600 + DDRC/MPAM 修复（`ee17e1eb...`） |
 | `drivers/Arm64Gop_1_68.efi` | 原厂 pre-SoC15 AArch64 GOP（与 BIOS 内原 PE 字节一致，`22021e0a...`） |
 | `drivers/ARM64Gop_2_10.efi` | AMD post-SoC15 AArch64 GOP，原生 Vega 10/12/20（`c0b47fe3...`） |
+| `drivers/ARM64Gop_3_1_0.efi` | 从 RX 6600 VBIOS 提取的 AMD AArch64 GOP 3.1.0，Navi 23（`e84a703d...`） |
 | `images/Huawei-Logo.wine.png` | 开机 LOGO 源图（3000x2000，透明背景） |
 | `images/Huawei-Logo.bmp` | 固件用 840x260 24-bit 开机 LOGO（`8944e3eb...`） |
 | `reference/vbios.rom` | Vega 20 显卡 VBIOS dump |
 | `reference/AMD.RadeonProVII.16384.200818.rom` | 参考 VBIOS |
+| `reference/Sapphire.RX6600.8192.210615.rom` | Sapphire RX 6600 VBIOS（3.1.0 GOP 提取源） |
 | `reports/BC32MBHB-D920L11K-2251K_1.0_2020-07-22.bin.report.txt` | 原厂镜像 UEFIExtract 结构报告 |
-| `reports/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin.report.txt` | 1.0-4 镜像 UEFIExtract 结构报告 |
-| `scripts/rebuild_bios.py` | 解压/追加 GOP/替换版本与 LOGO/DSDT HID/BL31 MPAM/重压缩/重建镜像，带自检 |
+| `reports/BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin.report.txt` | 1.0-5 镜像 UEFIExtract 结构报告 |
+| `scripts/rebuild_bios.py` | 解压/追加 2.10 与 3.1.0 GOP/替换版本与 LOGO/DSDT HID/BL31 MPAM/重压缩/重建镜像，带自检 |
 | `docs/FLASH_GUIDE.md` | 直接刷写步骤 |
 
 ---
@@ -485,3 +499,76 @@ uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-4_2020-07-22.bin" rep
   `https://patchwork.kernel.org/project/linux-arm-kernel/patch/20241010084217.37540-1-youwan@nfschina.com/`
 - `arm64.nompam` 说明（firmware 未初始化 MPAM 的绕过）：
   Linux `Documentation/arch/arm64/mpam.rst` / `arm64: Add override for MPAM`
+
+---
+
+## 12. RX 6600 / Navi 23 支持（1.0-5）
+
+### 12.1 关键发现：VBIOS 自带 AArch64 GOP
+
+`reference/Sapphire.RX6600.8192.210615.rom` 是 1 MiB PCI option ROM
+（SHA-256 `f02570096b04a4cb9a803c5e8d2336fc1107e5ff8697f0f5ddf26ab4005e6da2`），
+PCIR 设备 `1002:73FF`，ATOM `113-2447LHS-UDB` / `NAVI23`。
+它不是只能给 x86 用：ROM 里除了 legacy x86 和 x86_64 EFI 镜像，还包含一个
+**AArch64 EFI 镜像**：
+
+| 镜像 | ROM 偏移 | 大小 | machine | 压缩流 |
+|---|---:|---:|---|---|
+| legacy x86 | `0x0` | `0xB200` | — | — |
+| EFI x86_64 | `0xB200` | `0x9600` | `0x8664` | `0x94BC → 0xFE78` |
+| EFI AArch64 | `0x14800` | `0x9C00` | `0xAA64` | `0x99CC → 0x11A40` |
+
+AArch64 镜像的压缩流头在 ROM `0x14864`：`CompSize = 0x99CC`（**不含**
+8 字节头）、`OrigSize = 0x11A40`，数据从 `0x1486C` 开始，总长
+`0x99CC + 8`。解压后就是一个完整的 AMD AArch64 GOP，因此**不需要给
+2.10 打设备表补丁**，也不需要使用 x86/x86_64 代码。
+
+### 12.2 提取与驱动事实
+
+- UEFIExtract 的 Tiano 解压器解不了 AMD VBIOS 的压缩流（x86_64 和 AArch64
+  两个镜像都失败）；改用 `python-eficompressor` 的 EDK2 `Decompress.c`
+  编译独立工具，调用 `Extract(..., Algorithm=1)`（UEFI 压缩，不是
+  Framework/Tiano 的 `Algorithm=2`）解出。
+- 解出的 PE：`drivers/ARM64Gop_3_1_0.efi`，大小 `0x11A40`，SHA-256
+  `e84a703d0e97240aeaa4acec406bb9c2ad4d901a08d33e41f8f93b9eec0032fc`。
+- PE 事实：machine `0xAA64`、PE32+、subsystem `0x0B`（boot service driver）、
+  3 个 section、entry `0xD040`、SizeOfImage `0xF8E0`；
+  Authenticode Security 目录 `0xF8E0/0x2160`，PE checksum `0x136A7`
+  （校验通过）；版本字符串
+  `AMD GOP ARM64 Release Driver, Rev. 3.1.0.Mar 14 2021.23:19:12`；
+  证书链为 Microsoft UEFI CA 2011 → Microsoft Windows UEFI Driver Publisher，
+  与 1.68/2.10 同一信任链。
+- 驱动 PE **逐字节未修改**；只在外面包了新的 FFS：
+  - GUID `7E3C9B1A-5D42-4F86-A0C7-2B9E8D1F4A63`
+  - UI `ARM64Gop 3.1.0 RX6600`
+  - PE32 section `0x10`，UI section `0x15`，FFS `0x11A8C`
+  - 追加位置 inner `0xE8E428`；inner FV `0xE9FEC0`；
+    outer section `0x1F3A8A`、outer FFS `0x1F3AA2`，FV2 余量 `0x8DEE`。
+
+### 12.3 设备匹配与风险
+
+3.1.0 驱动来自 RX 6600 的 VBIOS，代码中没有 2.10 那种 6 字节
+`{family, start, end}` 设备表；它检查 PCI vendor `0x1002`、class `0x03`
+和显卡自身 VBIOS 的合法性，因此**可能也匹配其他 AMD 显卡**。
+1.0-5 保留原 1.68 和 2.10 FFS 不变；如果 3.1.0 在 Radeon 520 / Vega 20
+上也绑定，可能出现重复 GOP/显示回退。实机测试必须同时回归这两张卡。
+
+若出现重复绑定：
+- 先回退 1.0-4（已验证的镜像）；
+- 或在 `scripts/rebuild_bios.py` 中暂时去掉 2.10 或 3.1.0 FFS 重新构建，
+  用实机结果决定最终保留哪一个；
+- 不要通过修改 3.1.0 PE 来限制设备表，否则会破坏 AMD 签名。
+
+### 12.4 实机验证状态
+
+RX 6600 尚未上机验证。建议步骤：
+
+1. SPI 编程器写完整 1.0-5（16 MiB），读回校验 SHA-256
+   `ee17e1eb761d658e7e0c9104ac7dcefade8156a90ac826329616489ad3027c77`；
+2. 只插 RX 6600，观察 POST/Setup 是否有画面；
+3. Linux 中确认 `lspci -nn | grep 1002:73ff`、`dmesg` 中
+   `simple-framebuffer`/`simpledrm` 和 amdgpu 接管；
+4. 分别单插 Radeon 520、Vega 20，确认原显示功能没有回退；
+5. 若 RX 6600 已枚举但无显示：记录结果，说明 3.1.0 的初始化路径仍不适配
+   本平台，按 §12.3 调整；若 PCIe 不枚举，则与 RX 5700 XT 同类，BIOS/GOP
+   无法解决。
