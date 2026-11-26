@@ -11,7 +11,10 @@
   （SHA-256 `ee17e1eb761d658e7e0c9104ac7dcefade8156a90ac826329616489ad3027c77`）
 
 状态：Radeon 520 / Vega 20 的 GOP 方案已实机验证；1.0-5 新增 RX 6600
-（Navi 23，`1002:73FF`）的 3.1.0 AArch64 GOP，**待实机验证**。
+（Navi 23，`1002:73FF`）的 3.1.0 AArch64 GOP，**已实机验证**（2026-11-27，
+单卡：BIOS POST/Setup 与 Linux 显示均正常；`06:00.0` = `1002:73ff`；
+amdgpu 3.64.0 初始化成功，DCN 3.0.2、`fb0: amdgpudrmfb`；MI50 / Vega 20
+回归正常）。
 Vega 20 下固件通过 GOP 交接 `simple-framebuffer`，随后 amdgpu 接管。
 1.0-4 的开机 LOGO 已实机验证：840x260 预补偿版显示正常、比例/大小合适。
 DDRC ACPI 修复已实机验证：DSDT 中 DDRC 设备变为 `HISI9999`，
@@ -366,8 +369,11 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 
 ### 7.2 1.0-4 结果（历史）与 1.0-5 状态
 
-- **1.0-5 / RX 6600**：新增 3.1.0 AArch64 GOP，**待实机验证**；需回归
-  Radeon 520 / Vega 20，确认没有重复绑定或显示回退。
+- **1.0-5 / RX 6600**：新增 3.1.0 AArch64 GOP，**已实机验证**（2026-11-27，
+  单卡）：BIOS POST/Setup 与 Linux 显示均正常；`lspci` 确认 `06:00.0` =
+  `1002:73ff`，HDMI/DP audio `06:00.1` = `1002:ab28`；amdgpu 3.64.0
+  初始化成功（Display Core DCN 3.0.2、28 CU、8 GB、`fb0: amdgpudrmfb`）。
+  MI50 / Vega 20 回归正常；Radeon 520 未在 1.0-5 上单独回归。
 - **Radeon 520**：原 1.68 驱动正常显示，行为与原厂一致。
 - **Vega 20**：BIOS POST/Setup 画面正常；内核日志出现
   `simple-framebuffer.0` / `simpledrm`，证明固件 GOP 已初始化并向 OS 交接
@@ -420,8 +426,10 @@ Start 仍不能初始化 Vega 20（详见第 7.3 节），因此最终改用 2.1
 ## 8. 风险与限制
 
 - **RX 5700 XT**：2.10 设备表覆盖 Navi 10，但平台 PCIe 不枚举，实际不支持。
-- **RX 6600（RDNA2）**：1.0-5 通过 3.1.0 GOP 支持，待实机验证；3.1.0 的
-  绑定逻辑由 VBIOS 驱动，可能也匹配其他 AMD 显卡，需回归 520 / Vega 20。
+- **RX 6600（RDNA2）**：1.0-5 通过 3.1.0 GOP 支持，已实机验证（单卡，
+  `06:00.0` / `1002:73ff`，BIOS 和 Linux 显示正常）；MI50 / Vega 20 回归
+  正常，Radeon 520 未在 1.0-5 上单独回归。3.1.0 的绑定逻辑由 VBIOS 驱动，
+  可能也匹配其他 AMD 显卡。
 - **其他 RX 6000**：没有对应 VBIOS 提取的 GOP，未验证。
 - **BL31 MPAM 补丁风险**：修改 EL3 代码；写错会导致主板无法启动，只能
   用 SPI 编程器恢复。构建脚本对 FIP/BL31/pattern/stub/diff 做严格校验，
@@ -550,8 +558,10 @@ AArch64 镜像的压缩流头在 ROM `0x14864`：`CompSize = 0x99CC`（**不含*
 3.1.0 驱动来自 RX 6600 的 VBIOS，代码中没有 2.10 那种 6 字节
 `{family, start, end}` 设备表；它检查 PCI vendor `0x1002`、class `0x03`
 和显卡自身 VBIOS 的合法性，因此**可能也匹配其他 AMD 显卡**。
-1.0-5 保留原 1.68 和 2.10 FFS 不变；如果 3.1.0 在 Radeon 520 / Vega 20
-上也绑定，可能出现重复 GOP/显示回退。实机测试必须同时回归这两张卡。
+1.0-5 保留原 1.68 和 2.10 FFS 不变。实机结果：RX 6600 单卡正常，
+MI50 / Vega 20 也正常；Radeon 520 未在 1.0-5 上单独回归（1.68 驱动未改，
+1.0-4 验证仍有效）。如果以后在 520 或其他 AMD 卡上出现重复 GOP/显示
+回退，按下面的步骤调整。
 
 若出现重复绑定：
 - 先回退 1.0-4（已验证的镜像）；
@@ -561,14 +571,22 @@ AArch64 镜像的压缩流头在 ROM `0x14864`：`CompSize = 0x99CC`（**不含*
 
 ### 12.4 实机验证状态
 
-RX 6600 尚未上机验证。建议步骤：
+RX 6600 已于 2026-11-27 单卡实机验证：
 
-1. SPI 编程器写完整 1.0-5（16 MiB），读回校验 SHA-256
-   `ee17e1eb761d658e7e0c9104ac7dcefade8156a90ac826329616489ad3027c77`；
-2. 只插 RX 6600，观察 POST/Setup 是否有画面；
-3. Linux 中确认 `lspci -nn | grep 1002:73ff`、`dmesg` 中
-   `simple-framebuffer`/`simpledrm` 和 amdgpu 接管；
-4. 分别单插 Radeon 520、Vega 20，确认原显示功能没有回退；
-5. 若 RX 6600 已枚举但无显示：记录结果，说明 3.1.0 的初始化路径仍不适配
-   本平台，按 §12.3 调整；若 PCIe 不枚举，则与 RX 5700 XT 同类，BIOS/GOP
-   无法解决。
+- SPI 编程器写入完整 1.0-5（16 MiB），读回校验 SHA-256
+  `ee17e1eb761d658e7e0c9104ac7dcefade8156a90ac826329616489ad3027c77`；
+- BIOS POST/Setup 画面正常显示在 RX 6600 上；
+- Linux 显示正常，`lspci -nn` 确认 `06:00.0` = `1002:73ff`
+  （Navi 23），HDMI/DP audio `06:00.1` = `1002:ab28`；
+- `dmesg` 确认 amdgpu 3.64.0 初始化成功：Display Core DCN 3.0.2、
+  28 CU、8 GB 显存、`fb0: amdgpudrmfb`；HDMI/DP audio 由
+  `snd_hda_intel` 绑定；
+- MI50 / Vega 20 在同一镜像上回归正常（BIOS 和 Linux 均正常）；
+- Radeon 520 未在 1.0-5 上单独回归（1.68 驱动未改，1.0-4 验证仍有效）。
+
+后续可选验证/限制：
+
+1. 若要在 1.0-5 上使用 Radeon 520，建议单独确认；3.1.0 的绑定逻辑由
+   VBIOS 驱动，可能匹配其他 AMD 显卡；
+2. 更换其他 RX 6000 型号需要对应 VBIOS 里的 AArch64 GOP，当前只验证了
+   RX 6600（Navi 23）。

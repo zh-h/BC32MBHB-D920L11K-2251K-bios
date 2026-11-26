@@ -33,9 +33,12 @@
   `MPAM3_EL3 = 0x8000000000000000`（MPAMEN=1，TRAPLOWER=0）；
   只改 BL31 内 32 字节；
 - RX 5700 XT 在 Kunpeng 上不被 PCIe 枚举（电气/链路不兼容），本镜像不支持；
-- RX 6600 由 3.1.0 GOP 负责，**待实机验证**；其他 RX 6000 型号未验证；
-- 3.1.0 GOP 的绑定逻辑由 VBIOS 驱动，可能也匹配其他 AMD 显卡；测试时需
-  同时回归 Radeon 520 / Vega 20。
+- RX 6600 由 3.1.0 GOP 负责，**已实机验证（单卡）**：BIOS POST/Setup 和
+  Linux 显示正常，`lspci` 确认 `06:00.0` = `1002:73ff`（含 HDMI/DP audio
+  `1002:ab28`），amdgpu 3.64.0 接管（DCN 3.0.2、`fb0: amdgpudrmfb`）；
+  其他 RX 6000 型号未验证；
+- 3.1.0 GOP 的绑定逻辑由 VBIOS 驱动，可能也匹配其他 AMD 显卡；MI50 /
+  Vega 20 已回归正常，Radeon 520 未在 1.0-5 上单独回归。
 
 SHA-256：
 
@@ -50,8 +53,8 @@ ee17e1eb761d658e7e0c9104ac7dcefade8156a90ac826329616489ad3027c77
 > 复制到 U 盘，在 BIOS Setup 的固件升级功能中选择文件名
 > `BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin` 刷写
 > （U 盘界面只显示文件名，没有 `firmware/modified/` 路径）。
-> 1.0-3 → 1.0-4 的 DDRC 测试镜像已实机验证可用；1.0-5 新增 RX 6600 GOP，
-> 待实机验证。
+> 1.0-3 → 1.0-4 的 DDRC 测试镜像已实机验证可用；1.0-5 已在 RX 6600
+> 单卡上实机验证（BIOS + Linux 显示正常）。
 > **最终镜像含 BL31 修改，建议用 SPI 编程器写整片**：同版本内置升级
 > 可能被 `VersionCheck` 拒绝，且编程器能确保 BL31 区域写入。若走内置
 > 升级，刷后必须读回核对 BL31 `0xBB328D/0xBB33A5/0xBBB08D`。
@@ -79,7 +82,8 @@ Radeon 520 或 Vega 20 的显示器出现 BIOS POST/Setup 画面即成功。
 随后 amdgpu 接管（`VEGA20 0x1002:0x66A1`，ATOM BIOS `113-D1640600-104`）。
 
 1.0-4 最终镜像已实机验证：从 U 盘启动、GRUB 去掉两个参数可正常启动。
-1.0-5 的 RX 6600 显示待实机验证；去掉两个内核参数后再检查：
+1.0-5 的 RX 6600 单卡显示已实机验证（`06:00.0`，`1002:73ff`）；
+去掉两个内核参数后再检查：
 
 ```bash
 cat /proc/cmdline          # 不应再有 arm64.nompam / initcall_blacklist
@@ -163,7 +167,8 @@ SHA-256 e900c384175cf424b970163109cfe36829fa0d459fbd99d1af954257f63b3704
 - **RX 5700 XT**：实测在 Kunpeng 上不被 PCIe 枚举（Gen3/2/1 target 均
   `LnkSta 2.5GT/s x1, DLActive-`），是 PCIe 电气/链路不兼容，不是 GOP 问题；
   本平台不支持。
-- **RX 6600**：由 3.1.0 GOP 负责，待实机验证；其他 RX 6000 型号未验证。
+- **RX 6600**：由 3.1.0 GOP 负责，已实机验证（单卡，`06:00.0` / `1002:73ff`，
+  BIOS 和 Linux 显示正常）；其他 RX 6000 型号未验证。
 - EC 版本 `0.23` 是独立 EC 固件，不随本 BIOS 镜像改变；
   BIOS Version 字段为 `1.0-5`。
 - **BL31 修改风险**：EL3 代码写错会导致主板无法启动，只能用 SPI 编程器

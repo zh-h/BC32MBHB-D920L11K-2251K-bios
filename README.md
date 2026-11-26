@@ -89,8 +89,11 @@ firmware/modified/BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin
   `hisi_uncore_ddrc` 未加载；
 - BL31 MPAM 修复已实机验证：从 U 盘启动、GRUB 中同时去掉
   `arm64.nompam` 和 `initcall_blacklist` 可正常启动；
-- **RX 6600：1.0-5 新增 3.1.0 GOP，待实机验证**；测试时需同时回归
-  Radeon 520 / Vega 20，确认新增驱动没有重复绑定或显示回退。
+- **RX 6600：1.0-5 已实机验证（2026-11-27，单卡）**：BIOS POST/Setup
+  和 Linux 显示均正常；`lspci` 确认 `06:00.0` = `1002:73ff`，amdgpu 3.64.0
+  正常接管（DCN 3.0.2、`fb0: amdgpudrmfb`）；MI50 / Vega 20 在同一镜像上
+  回归正常。Radeon 520 未在 1.0-5 上单独回归（1.68 驱动未改，1.0-4 验证
+  仍有效）。
 
 SHA-256：
 
@@ -112,19 +115,21 @@ ee17e1eb761d658e7e0c9104ac7dcefade8156a90ac826329616489ad3027c77
 
 | 显卡 | BIOS 显示 | 说明 |
 |---|---|---|
-| Radeon 520 / Polaris | ✅ | 原厂 1.68 pre-SoC15 GOP（字节未改） |
-| Vega 20（`1002:66A1`） | ✅ | 2.10 post-SoC15 GOP |
-| RX 6600 / Navi 23（`1002:73FF`） | 🟡 实验 | 3.1.0 签名 AArch64 GOP（从 RX 6600 VBIOS 提取）；待实机验证 |
-| Radeon 520 + Vega 20（同一镜像） | ✅ | 两个 GOP 并存；两卡分别验证正常 |
+| Radeon 520 / Polaris | ✅ | 原厂 1.68 pre-SoC15 GOP（字节未改；1.0-4 验证） |
+| Vega 20（`1002:66A1`） | ✅ | 2.10 post-SoC15 GOP；1.0-5 回归正常 |
+| RX 6600 / Navi 23（`1002:73FF`） | ✅ 单卡验证 | 3.1.0 签名 AArch64 GOP（从 RX 6600 VBIOS 提取）；BIOS POST/Setup 与 Linux 显示正常 |
+| Radeon 520 + Vega 20（同一镜像） | ✅ | 两个 GOP 并存；两卡分别验证正常（1.0-4） |
 | RX 5700 XT / Navi 10 | ❌ | 实测在 Kunpeng 上不被 PCIe 枚举（Gen3/2/1 均 `DLActive-`），电气/链路不兼容，不是 BIOS/GOP 问题 |
 | RX 6000 其他型号 | ❌/未知 | 仅 RX 6600 的 3.1.0 驱动来自对应 VBIOS；其他 ID 未验证 |
 
 - Vega 20 下内核日志出现 `simple-framebuffer`/`simpledrm`，随后 amdgpu 接管。
 - 除 GOP/LOGO/DSDT/BL31 补丁外，前 8 MiB 的 bootloader/IMU 和其他 FV
   结构保持不变。
-- 3.1.0 GOP 的绑定逻辑由 VBIOS 驱动，可能也匹配其他 AMD 显卡；测试 RX 6600
-  时必须同时回归 Radeon 520 / Vega 20。若出现重复绑定或显示回退，回退
-  1.0-4 或按 `docs/KP920_VEGA20_BIOS_NOTES.md` 的 RX 6600 章节调整。
+- 1.0-5 已实机验证 RX 6600 单卡（BIOS + Linux 显示）和 MI50 / Vega 20
+  回归；Radeon 520 未在 1.0-5 上单独回归。
+- 3.1.0 GOP 的绑定逻辑由 VBIOS 驱动，可能也匹配其他 AMD 显卡；若以后
+  使用 520 或其他 AMD 卡出现重复绑定/显示异常，回退 1.0-4 或按
+  `docs/KP920_VEGA20_BIOS_NOTES.md` 的 RX 6600 章节调整。
 
 ## 3. 安装依赖
 
@@ -193,8 +198,9 @@ uefiextract "firmware/modified/BC32MBHB-D920L11K-2251K_1.0-5_2020-07-22.bin" rep
 
 支持两种方式。**BIOS 内置固件升级已实机验证**（DDRC ACPI 修复的
 1.0-4 测试镜像）；1.0-4 的启动验证已通过（U 盘启动，去掉两个参数）。
-**1.0-5 新增 RX 6600 GOP，待实机验证**；刷写时仍建议用 SPI 编程器写整片，
-确保 BL31 区域确实写入，并避免同版本 `VersionCheck` 拒绝。
+**1.0-5 已在 RX 6600 单卡上实机验证**（BIOS 和 Linux 显示正常）；刷写时
+仍建议用 SPI 编程器写整片，确保 BL31 区域确实写入，并避免同版本
+`VersionCheck` 拒绝。
 
 ### 5.1 BIOS 内置固件升级（Step 1 已验证）
 
